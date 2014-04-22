@@ -1,6 +1,6 @@
 # How to contribute
 
-CSLA .NET is developed and maintained by a [global development team](http://www.lhotka.net/Article.aspx?area=4&id=bbe426f7-cd06-482f-bfa7-ec5640296562) composed of volunteers. We welcome your help!
+cslajs is developed and maintained by a [global development team](http://www.lhotka.net/Article.aspx?area=4&id=bbe426f7-cd06-482f-bfa7-ec5640296562) composed of volunteers. We welcome your help!
 
 ## Getting started
 
@@ -35,10 +35,6 @@ or
 ````
 
 * Make sure you have added the necessary tests for your changes.
-* Run _all_ the tests to assure nothing else was accidentally broken. This is
-  particularly important because CSLA .NET is cross-platform (WinRT, .NET, Silverlight,
-  mono, mono for Android, etc.) and you _must_ ensure your code compiles and runs on all
-  these platforms!
 
 ## Submitting Changes
 
@@ -54,4 +50,4 @@ or
 
 * [General GitHub documentation](http://help.github.com/)
 * [GitHub pull request documentation](http://help.github.com/send-pull-requests/)
-* [CSLA .NET forum](http://forums.lhotka.net/forums/5.aspx/)
+* [CSLA forum](http://forums.lhotka.net/forums/5.aspx/)
