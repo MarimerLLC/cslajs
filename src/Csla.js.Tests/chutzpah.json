@@ -1,0 +1,8 @@
+﻿{
+    "Framework": "qunit",
+    "RootReferencePathMode": "SettingsFileDirectory",
+    "References":  [ { "Path": "../" } ],
+    "Compile":  {
+        "Mode":  "External"
+    }
+}
