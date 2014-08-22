@@ -55,10 +55,11 @@
     <TypeScriptModuleKind>AMD</TypeScriptModuleKind>
   </PropertyGroup>
   <ItemGroup>
+    <TypeScriptCompile Include="Core\BusinessBaseTests.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortalTests.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpersTests.ts" />
     <TypeScriptCompile Include="Scripts\typings\qunit\qunit.d.ts" />
-    <TypeScriptCompile Include="SerializationTests.ts" />
+    <TypeScriptCompile Include="Serialization\SerializationTests.ts" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="packages.config" />

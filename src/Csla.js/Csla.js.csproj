@@ -65,7 +65,8 @@
     <TypeScriptCompile Include="Core\ServerDataPortal.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpers.ts" />
     <TypeScriptCompile Include="Core\IDataPortal.ts" />
-    <TypeScriptCompile Include="Serialization.ts" />
+    <TypeScriptCompile Include="Serialization\IDeserialization.ts" />
+    <TypeScriptCompile Include="Serialization\Serializer.ts" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(VSToolsPath)\TypeScript\Microsoft.TypeScript.targets" Condition="Exists('$(VSToolsPath)\TypeScript\Microsoft.TypeScript.targets')" />

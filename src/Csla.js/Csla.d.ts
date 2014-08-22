@@ -37,11 +37,26 @@ declare module Csla {
     }
 }
 declare module Csla {
+    module Serialization {
+        /**
+        * @summary An interface that defines the deserialization process.
+        */
+        interface IDeserialization {
+            /**
+            * @summary Used to provide deserialization information to an object.
+            * @param obj The deserialization information (usually as a simple JSON object).
+            * @param scope The scope to use to create and deserialize objects.
+            */
+            deserialize(obj: Object, scope: Object): any;
+        }
+    }
+}
+declare module Csla {
     module Core {
         /**
         * @summary The core type for editable business objects.
         */
-        class BusinessBase {
+        class BusinessBase implements Serialization.IDeserialization {
             private _classIdentifier;
             /**
             * @summary Creates an instance of the class.
@@ -56,13 +71,7 @@ declare module Csla {
             of being part of the data portal operation pipeline.
             */
             public create(parameters?: Object): void;
-            /**
-            * @summary Allows the object to initialize object state from a JSON serialization string.
-            * @param obj The deserialized object.
-            * @param replacements An optional object containing keys and corresponding constructor functions
-            specifying which fields on the current object should be created and initialized with the deserialized value.
-            */
-            public deserialize(obj: Object, replacements?: any): void;
+            public deserialize(obj: Object, scope: Object): void;
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "fetch" operation on the object.
             * @param parameters An optional argument containing data needed by the object for fetching.
@@ -135,8 +144,10 @@ declare module Csla {
     }
 }
 declare module Csla {
-    class Serialization {
-        public serialize(obj: any): string;
-        public deserialize<T extends Core.BusinessBase>(text: string, c: new(scope: any) => T, scope: any): T;
+    module Serialization {
+        class Serializer {
+            public serialize(obj: Object): string;
+            public deserialize<T extends Core.BusinessBase>(text: string, c: new(scope: Object, ctor: Function) => T, scope: Object): T;
+        }
     }
 }

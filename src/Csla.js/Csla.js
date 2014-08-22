@@ -1,4 +1,4 @@
-var Csla;
+﻿var Csla;
 (function (Csla) {
     (function (Reflection) {
         /**
@@ -83,6 +83,7 @@ var Csla;
     var Reflection = Csla.Reflection;
 })(Csla || (Csla = {}));
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
+/// <reference path="../Serialization/IDeserialization.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -108,20 +109,35 @@ var Csla;
                 throw new Error("Must implement create() in subclass.");
             };
 
-            /**
-            * @summary Allows the object to initialize object state from a JSON serialization string.
-            * @param obj The deserialized object.
-            * @param replacements An optional object containing keys and corresponding constructor functions
-            specifying which fields on the current object should be created and initialized with the deserialized value.
-            */
-            BusinessBase.prototype.deserialize = function (obj, replacements) {
+            ///**
+            //* @summary Allows the object to initialize object state from a JSON serialization string.
+            //* @param obj The deserialized object.
+            //* @param replacements An optional object containing keys and corresponding constructor functions
+            //specifying which fields on the current object should be created and initialized with the deserialized value.
+            //*/
+            //deserialize(obj: Object, replacements?: any) {
+            //	for (var key in obj) {
+            //		if (replacements && replacements.hasOwnProperty(key)) {
+            //			var targetValue = <BusinessBase>replacements[key];
+            //			targetValue.deserialize(obj[key]);
+            //			this[key] = targetValue;
+            //		}
+            //		else {
+            //			this[key] = obj[key];
+            //		}
+            //	}
+            //}
+            BusinessBase.prototype.deserialize = function (obj, scope) {
                 for (var key in obj) {
-                    if (replacements && replacements.hasOwnProperty(key)) {
-                        var targetValue = replacements[key];
-                        targetValue.deserialize(obj[key]);
+                    var value = obj[key];
+
+                    if (value.hasOwnProperty("_classIdentifier")) {
+                        // This is an object that is a BusinessBase. Create it, and deserialize.
+                        var targetValue = Csla.Reflection.ReflectionHelpers.createObject(value["_classIdentifier"], scope);
+                        targetValue.deserialize(value, scope);
                         this[key] = targetValue;
                     } else {
-                        this[key] = obj[key];
+                        this[key] = value;
                     }
                 }
             };
@@ -206,23 +222,26 @@ var Csla;
     })(Csla.Core || (Csla.Core = {}));
     var Core = Csla.Core;
 })(Csla || (Csla = {}));
-/// <reference path="Core/BusinessBase.ts" />
+/// <reference path="../Core/BusinessBase.ts" />
 var Csla;
 (function (Csla) {
-    var Serialization = (function () {
-        function Serialization() {
-        }
-        Serialization.prototype.serialize = function (obj) {
-            return JSON.stringify(obj);
-        };
+    (function (Serialization) {
+        var Serializer = (function () {
+            function Serializer() {
+            }
+            Serializer.prototype.serialize = function (obj) {
+                return JSON.stringify(obj);
+            };
 
-        Serialization.prototype.deserialize = function (text, c, scope) {
-            var result = new c(scope);
-            result.deserialize(JSON.parse(text));
-            return result;
-        };
-        return Serialization;
-    })();
-    Csla.Serialization = Serialization;
+            Serializer.prototype.deserialize = function (text, c, scope) {
+                var result = new c(scope, c);
+                result.deserialize(JSON.parse(text), scope);
+                return result;
+            };
+            return Serializer;
+        })();
+        Serialization.Serializer = Serializer;
+    })(Csla.Serialization || (Csla.Serialization = {}));
+    var Serialization = Csla.Serialization;
 })(Csla || (Csla = {}));
 //# sourceMappingURL=Csla.js.map
