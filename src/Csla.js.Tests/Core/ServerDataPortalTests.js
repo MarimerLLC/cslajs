@@ -26,12 +26,16 @@ var ServerDataPortalTests;
             _super.apply(this, arguments);
         }
         MyBusinessBaseWithCreateAndNoParameters.prototype.create = function () {
-            this.x = 1;
+            this._x = 1;
         };
 
-        MyBusinessBaseWithCreateAndNoParameters.prototype.getX = function () {
-            return this.x;
-        };
+        Object.defineProperty(MyBusinessBaseWithCreateAndNoParameters.prototype, "x", {
+            get: function () {
+                return this._x;
+            },
+            enumerable: true,
+            configurable: true
+        });
         return MyBusinessBaseWithCreateAndNoParameters;
     })(Csla.Core.BusinessBase);
     ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters = MyBusinessBaseWithCreateAndNoParameters;
@@ -42,12 +46,16 @@ var ServerDataPortalTests;
             _super.apply(this, arguments);
         }
         MyBusinessBaseWithCreateAndParameters.prototype.create = function (parameters) {
-            this.x = parameters;
+            this._x = parameters;
         };
 
-        MyBusinessBaseWithCreateAndParameters.prototype.getX = function () {
-            return this.x;
-        };
+        Object.defineProperty(MyBusinessBaseWithCreateAndParameters.prototype, "x", {
+            get: function () {
+                return this._x;
+            },
+            enumerable: true,
+            configurable: true
+        });
         return MyBusinessBaseWithCreateAndParameters;
     })(Csla.Core.BusinessBase);
     ServerDataPortalTests.MyBusinessBaseWithCreateAndParameters = MyBusinessBaseWithCreateAndParameters;
@@ -56,7 +64,7 @@ var ServerDataPortalTests;
 QUnit.test("create via constructor and no parameters with overload of no parameters", function (assert) {
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
     var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters);
-    assert.equal(businessObject.getX(), 1);
+    assert.strictEqual(businessObject.x, 1);
 });
 
 /**
@@ -66,12 +74,12 @@ playground on TS's site as expected. It does not fail here.
 QUnit.test("create via constructor and parameters with overload of no parameters", function (assert) {
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
     var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters, 2);
-    assert.equal(businessObject.getX(), 1);
+    assert.strictEqual(businessObject.x, 1);
 });
 
 QUnit.test("create via constructor and parameters with overload of parameters", function (assert) {
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
     var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndParameters, 1);
-    assert.equal(businessObject.getX(), 1);
+    assert.strictEqual(businessObject.x, 1);
 });
 //# sourceMappingURL=ServerDataPortalTests.js.map

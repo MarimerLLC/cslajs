@@ -9,81 +9,106 @@ var __extends = this.__extends || function (d, b) {
 };
 QUnit.module("Serialization tests: ");
 
-var Age = (function (_super) {
-    __extends(Age, _super);
-    function Age() {
-        _super.apply(this, arguments);
-    }
-    Age.prototype.getValue = function () {
-        return this.value;
-    };
+var serializationTestsScope = {};
 
-    Age.prototype.setValue = function (value) {
-        this.value = value;
-    };
-    return Age;
-})(Csla.Core.BusinessBase);
+var SerializationTests;
+(function (SerializationTests) {
+    var Age = (function (_super) {
+        __extends(Age, _super);
+        function Age(scope) {
+            _super.call(this, scope, this.constructor);
+        }
+        Object.defineProperty(Age.prototype, "value", {
+            get: function () {
+                return this._value;
+            },
+            set: function (value) {
+                this._value = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
 
-var Person = (function (_super) {
-    __extends(Person, _super);
-    function Person() {
-        _super.apply(this, arguments);
-    }
-    Person.prototype.getAge = function () {
-        return this.age;
-    };
+        return Age;
+    })(Csla.Core.BusinessBase);
+    SerializationTests.Age = Age;
 
-    Person.prototype.getFirstName = function () {
-        return this.firstName;
-    };
+    var Person = (function (_super) {
+        __extends(Person, _super);
+        function Person(scope) {
+            _super.call(this, scope, this.constructor);
+        }
+        Object.defineProperty(Person.prototype, "age", {
+            get: function () {
+                return this._age;
+            },
+            set: function (value) {
+                this._age = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
 
-    Person.prototype.getLastName = function () {
-        return this.lastName;
-    };
 
-    Person.prototype.setAge = function (value) {
-        this.age = value;
-    };
+        Object.defineProperty(Person.prototype, "firstName", {
+            get: function () {
+                return this._firstName;
+            },
+            set: function (value) {
+                this._firstName = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
 
-    Person.prototype.setFirstName = function (value) {
-        this.firstName = value;
-    };
 
-    Person.prototype.setLastName = function (value) {
-        this.lastName = value;
-    };
+        Object.defineProperty(Person.prototype, "lastName", {
+            get: function () {
+                return this._lastName;
+            },
+            set: function (value) {
+                this._lastName = value;
+            },
+            enumerable: true,
+            configurable: true
+        });
 
-    Person.prototype.deserialize = function (obj) {
-        _super.prototype.deserialize.call(this, obj, { age: new Age() });
-    };
-    return Person;
-})(Csla.Core.BusinessBase);
+
+        Person.prototype.deserialize = function (obj) {
+            _super.prototype.deserialize.call(this, obj, { _age: new SerializationTests.Age(serializationTestsScope) });
+        };
+        return Person;
+    })(Csla.Core.BusinessBase);
+    SerializationTests.Person = Person;
+})(SerializationTests || (SerializationTests = {}));
+
+serializationTestsScope = { SerializationTests: SerializationTests };
 
 QUnit.test("serialization roundtrip with BusinessBase that contains BusinessBase", function (assert) {
-    var person = new Person();
-    person.setFirstName("Jane");
-    person.setLastName("Smith");
-    var personAge = new Age();
-    personAge.setValue(40);
-    person.setAge(personAge);
+    var person = new SerializationTests.Person(serializationTestsScope);
+    person.firstName = "Jane";
+    person.lastName = "Smith";
+    var personAge = new SerializationTests.Age(serializationTestsScope);
+    personAge.value = 40;
+    person.age = personAge;
 
     var serialization = new Csla.Serialization();
     var serializedPerson = serialization.serialize(person);
-    var deserializedPerson = serialization.deserialize(serializedPerson, Person);
+    var deserializedPerson = serialization.deserialize(serializedPerson, SerializationTests.Person, serializationTestsScope);
 
-    assert.equal(deserializedPerson.getAge().getValue(), 40);
-    assert.equal(deserializedPerson.getFirstName(), "Jane");
-    assert.equal(deserializedPerson.getLastName(), "Smith");
+    assert.strictEqual(deserializedPerson.age.value, 40);
+    assert.strictEqual(deserializedPerson.firstName, "Jane");
+    assert.strictEqual(deserializedPerson.lastName, "Smith");
 });
 
 QUnit.test("serialization roundtrip with BusinessBase", function (assert) {
-    var age = new Age();
-    age.setValue(40);
+    var age = new SerializationTests.Age(serializationTestsScope);
+    age.value = 40;
 
     var serialization = new Csla.Serialization();
     var serializedAge = serialization.serialize(age);
-    var deserializedAge = serialization.deserialize(serializedAge, Age);
+    var deserializedAge = serialization.deserialize(serializedAge, SerializationTests.Age, reflectionHelpersTestsScope);
 
-    assert.equal(deserializedAge.getValue(), 40);
+    assert.strictEqual(deserializedAge.value, 40);
 });
 //# sourceMappingURL=SerializationTests.js.map

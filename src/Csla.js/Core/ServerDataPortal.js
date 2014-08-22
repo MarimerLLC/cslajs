@@ -1,4 +1,5 @@
 /// <reference path="IDataPortal.ts" />
+/// <reference path="../Reflection/ReflectionHelpers.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -14,36 +15,21 @@ var Csla;
                 this.scope = scope;
             }
             ServerDataPortal.prototype.createWithConstructor = function (c, parameters) {
-                var newObject = new c();
+                var newObject = new c(this.scope, c);
                 newObject.create(parameters);
                 return newObject;
             };
 
             /**
             * @summary Creates an instance of the class defined by an identifier, passing in parameters if they exist.
-            * @param typeName The name of the specific {@link Csla.Core.BusinessBase} class to create.
+            * @param classIdentifier The name of the specific {@link Csla.Core.BusinessBase} class to create.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
-            ServerDataPortal.prototype.createWithIdentifier = function (typeName, parameters) {
-                var newObject = new (this.getConstructorFunction(typeName))();
+            ServerDataPortal.prototype.createWithIdentifier = function (classIdentifier, parameters) {
+                var newObject = Csla.Reflection.ReflectionHelpers.createObject(classIdentifier, this.scope);
                 newObject.create(parameters);
                 return newObject;
-            };
-
-            ServerDataPortal.prototype.getConstructorFunction = function (typeName, parameters) {
-                var typeNameParts = typeName.split(".");
-
-                var constructorFunction = this.scope;
-                for (var i = 0; i < typeNameParts.length; i++) {
-                    constructorFunction = constructorFunction[typeNameParts[i]];
-                }
-
-                if (typeof constructorFunction !== "function") {
-                    throw new Error("Constructor for " + typeName + " not found.");
-                }
-
-                return constructorFunction;
             };
             return ServerDataPortal;
         })();

@@ -8,8 +8,8 @@ var Csla;
             return JSON.stringify(obj);
         };
 
-        Serialization.prototype.deserialize = function (text, c) {
-            var result = new c();
+        Serialization.prototype.deserialize = function (text, c, scope) {
+            var result = new c(scope);
             result.deserialize(JSON.parse(text));
             return result;
         };

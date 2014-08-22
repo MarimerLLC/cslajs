@@ -6,8 +6,8 @@ module Csla {
 			return JSON.stringify(obj);
 		}
 
-		deserialize<T extends Csla.Core.BusinessBase>(text: string, c: { new (): T; }): T {
-			var result = new c();
+		deserialize<T extends Csla.Core.BusinessBase>(text: string, c: { new (scope): T; }, scope: any): T {
+			var result = new c(scope);
 			result.deserialize(JSON.parse(text));
 			return result;
 		}

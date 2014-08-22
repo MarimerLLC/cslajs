@@ -1,3 +1,4 @@
+/// <reference path="../Reflection/ReflectionHelpers.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -5,14 +6,15 @@ var Csla;
         * @summary The core type for editable business objects.
         */
         var BusinessBase = (function () {
-            function BusinessBase() {
-            }
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @error This throw an error by default - subclasses must override this method to state their intent
             of being part of the data portal operation pipeline.
             */
+            function BusinessBase(scope, ctor) {
+                this.classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+            }
             BusinessBase.prototype.create = function (parameters) {
                 throw new Error("Must implement create() in subclass.");
             };

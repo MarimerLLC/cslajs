@@ -9,26 +9,26 @@ module ServerDataPortalTests {
 	}
 
 	export class MyBusinessBaseWithCreateAndNoParameters extends Csla.Core.BusinessBase {
-		private x: number;
+		private _x: number;
 
 		create() {
-			this.x = 1;
+			this._x = 1;
 		}
 
-		getX(): number {
-			return this.x;
+		public get x(): number {
+			return this._x;
 		}
 	}
 
 	export class MyBusinessBaseWithCreateAndParameters extends Csla.Core.BusinessBase {
-		private x: number;
+		private _x: number;
 
 		create(parameters?: any) {
-			this.x = <number>parameters;
+			this._x = <number>parameters;
 		}
 
-		getX(): number {
-			return this.x;
+		public get x(): number {
+			return this._x;
 		}
 	}
 }
@@ -36,7 +36,7 @@ module ServerDataPortalTests {
 QUnit.test("create via constructor and no parameters with overload of no parameters", (assert) => {
 	var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
 	var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters);
-	assert.equal(businessObject.getX(), 1);
+	assert.strictEqual(businessObject.x, 1);
 });
 
 /**
@@ -46,11 +46,11 @@ playground on TS's site as expected. It does not fail here.
 QUnit.test("create via constructor and parameters with overload of no parameters", (assert) => {
 	var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
 	var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters, 2);
-	assert.equal(businessObject.getX(), 1);
+	assert.strictEqual(businessObject.x, 1);
 });
 
 QUnit.test("create via constructor and parameters with overload of parameters", (assert) => {
 	var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
 	var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndParameters, 1);
-	assert.equal(businessObject.getX(), 1);
+	assert.strictEqual(businessObject.x, 1);
 });

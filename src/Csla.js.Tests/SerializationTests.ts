@@ -4,76 +4,92 @@
 
 QUnit.module("Serialization tests: ");
 
-class Age extends Csla.Core.BusinessBase {
-	private value: number;
+var serializationTestsScope = { };
 
-	getValue() {
-		return this.value;
+module SerializationTests {
+	export class Age extends Csla.Core.BusinessBase {
+		private _value: number;
+
+		constructor(scope: any) {
+			super(scope, this.constructor);
+		}
+
+		public get value(): number {
+			return this._value;
+		}
+
+		public set value(value: number) {
+			this._value = value;
+		}
 	}
 
-	setValue(value: number) {
-		this.value = value;
+	export class Person extends Csla.Core.BusinessBase {
+		private _firstName: string;
+		private _lastName: string;
+		private _age: Age;
+
+		constructor(scope: any) {
+			super(scope, this.constructor);
+		}
+
+		public get age(): Age {
+			return this._age;
+		}
+
+		public set age(value: Age) {
+			this._age = value;
+		}
+
+		public get firstName(): string {
+			return this._firstName;
+		}
+
+		public set firstName(value: string) {
+			this._firstName = value;
+		}
+
+		public get lastName(): string {
+			return this._lastName;
+		}
+
+		public set lastName(value: string) {
+			this._lastName = value;
+		}
+
+		deserialize(obj: any) {
+			super.deserialize(obj, { _age: new SerializationTests.Age(serializationTestsScope) });
+		}
 	}
 }
 
-class Person extends Csla.Core.BusinessBase {
-	private firstName: string;
-	private lastName: string;
-	private age: Age;
-
-	getAge() {
-		return this.age;
-	}
-
-	getFirstName() {
-		return this.firstName;
-	}
-
-	getLastName() {
-		return this.lastName;
-	}
-
-	setAge(value: Age) {
-		this.age = value;
-	}
-
-	setFirstName(value: string) {
-		this.firstName = value;
-	}
-
-	setLastName(value: string) {
-		this.lastName = value;
-	}
-
-	deserialize(obj: any) {
-		super.deserialize(obj, { age: new Age() });
-	}
-}
+serializationTestsScope = { SerializationTests: SerializationTests };
 
 QUnit.test("serialization roundtrip with BusinessBase that contains BusinessBase", (assert) => {
-	var person = new Person();
-	person.setFirstName("Jane");
-	person.setLastName("Smith");
-	var personAge = new Age();
-	personAge.setValue(40);
-	person.setAge(personAge);
+	var person = new SerializationTests.Person(serializationTestsScope);
+	person.firstName = "Jane";
+	person.lastName = "Smith";
+	var personAge = new SerializationTests.Age(serializationTestsScope);
+	personAge.value = 40;
+	person.age = personAge;
 
 	var serialization = new Csla.Serialization();
 	var serializedPerson = serialization.serialize(person);
-	var deserializedPerson = serialization.deserialize(serializedPerson, Person);
+	var deserializedPerson = serialization.deserialize(
+		serializedPerson, SerializationTests.Person, serializationTestsScope);
 
-	assert.equal(deserializedPerson.getAge().getValue(), 40);
-	assert.equal(deserializedPerson.getFirstName(), "Jane");
-	assert.equal(deserializedPerson.getLastName(), "Smith");
+	assert.strictEqual(deserializedPerson.age.value, 40);
+	assert.strictEqual(deserializedPerson.firstName, "Jane");
+	assert.strictEqual(deserializedPerson.lastName, "Smith");
 });
 
 QUnit.test("serialization roundtrip with BusinessBase", (assert) => {
-	var age = new Age();
-	age.setValue(40);
+	var age = new SerializationTests.Age(serializationTestsScope);
+	age.value = 40;
 
 	var serialization = new Csla.Serialization();
 	var serializedAge= serialization.serialize(age);
-	var deserializedAge = serialization.deserialize(serializedAge, Age);
+	var deserializedAge = serialization.deserialize(
+		serializedAge, SerializationTests.Age, reflectionHelpersTestsScope);
 
-	assert.equal(deserializedAge.getValue(), 40);
+	assert.strictEqual(deserializedAge.value, 40);
 });
