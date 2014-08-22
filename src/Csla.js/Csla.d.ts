@@ -42,14 +42,19 @@ declare module Csla {
         * @summary The core type for editable business objects.
         */
         class BusinessBase {
-            public classIdentifier: string;
+            private _classIdentifier;
+            /**
+            * @summary Creates an instance of the class.
+            * @param scope The scope to use to calculate the class identifier.
+            * @param ctor The constructor used (subclasses should pass in their constructor).
+            */
+            constructor(scope: Object, ctor: Function);
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @error This throw an error by default - subclasses must override this method to state their intent
             of being part of the data portal operation pipeline.
             */
-            constructor(scope: Object, ctor: Function);
             public create(parameters?: Object): void;
             /**
             * @summary Allows the object to initialize object state from a JSON serialization string.
@@ -65,6 +70,10 @@ declare module Csla {
             of being part of the data portal operation pipeline.
             */
             public fetch(parameters?: Object): void;
+            /**
+            * @summary Gets the class identifier for this object calculated from the scope given on construction.
+            */
+            public classIdentifier : string;
         }
     }
 }

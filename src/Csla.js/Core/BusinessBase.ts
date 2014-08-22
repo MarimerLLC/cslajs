@@ -6,7 +6,17 @@ module Csla {
 		* @summary The core type for editable business objects.
 		*/
 		export class BusinessBase {
-			public classIdentifier: string ;
+			private _classIdentifier: string ;
+
+			/**
+			* @summary Creates an instance of the class.
+			* @param scope The scope to use to calculate the class identifier.
+			* @param ctor The constructor used (subclasses should pass in their constructor).
+			*/
+			constructor(scope: Object, ctor: Function) {
+				this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(
+					ctor, scope);
+			}
 
 			/**
 			* @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
@@ -14,11 +24,6 @@ module Csla {
 			* @error This throw an error by default - subclasses must override this method to state their intent
 			of being part of the data portal operation pipeline.
 			*/
-			constructor(scope: Object, ctor: Function) {
-				this.classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(
-					ctor, scope);
-			}
-
 			create(parameters?: Object): void {
 				throw new Error("Must implement create() in subclass.");
 			}
@@ -50,6 +55,13 @@ module Csla {
 			*/
 			fetch(parameters?: Object): void {
 				throw new Error("Must implement fetch() in subclass.");
+			}
+
+			/**
+			* @summary Gets the class identifier for this object calculated from the scope given on construction.
+			*/
+			public get classIdentifier(): string {
+				return this._classIdentifier;
 			}
 		}
 	}
