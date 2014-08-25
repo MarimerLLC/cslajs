@@ -109,24 +109,11 @@ var Csla;
                 throw new Error("Must implement create() in subclass.");
             };
 
-            ///**
-            //* @summary Allows the object to initialize object state from a JSON serialization string.
-            //* @param obj The deserialized object.
-            //* @param replacements An optional object containing keys and corresponding constructor functions
-            //specifying which fields on the current object should be created and initialized with the deserialized value.
-            //*/
-            //deserialize(obj: Object, replacements?: any) {
-            //	for (var key in obj) {
-            //		if (replacements && replacements.hasOwnProperty(key)) {
-            //			var targetValue = <BusinessBase>replacements[key];
-            //			targetValue.deserialize(obj[key]);
-            //			this[key] = targetValue;
-            //		}
-            //		else {
-            //			this[key] = obj[key];
-            //		}
-            //	}
-            //}
+            /**
+            * @summary Allows the object to initialize object state from a JSON serialization string.
+            * @param obj The deserialized object.
+            * @param scope The scope to use to create objects if necessary.
+            */
             BusinessBase.prototype.deserialize = function (obj, scope) {
                 for (var key in obj) {
                     var value = obj[key];
@@ -170,34 +157,27 @@ var Csla;
 })(Csla || (Csla = {}));
 /// <reference path="../Scripts/typings/qunit/qunit.d.ts" />
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
-var __extends = this.__extends || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
-};
 QUnit.module("BusinessBase tests: ");
 
-var businessBaseTestsScope = {};
-
-var BusinessBaseTests;
-(function (BusinessBaseTests) {
-    var Widget = (function (_super) {
-        __extends(Widget, _super);
-        function Widget(scope) {
-            _super.call(this, scope, this.constructor);
-        }
-        return Widget;
-    })(Csla.Core.BusinessBase);
-    BusinessBaseTests.Widget = Widget;
-})(BusinessBaseTests || (BusinessBaseTests = {}));
-
-businessBaseTestsScope = { BusinessBaseTests: BusinessBaseTests };
+var businessBaseTestsScope = { Csla: Csla };
 
 QUnit.test("create BusinessBase and verify classIdentifier", function (assert) {
-    var widget = new BusinessBaseTests.Widget(businessBaseTestsScope);
+    var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+    assert.strictEqual(target.classIdentifier, "Csla.Core.BusinessBase");
+});
 
-    assert.strictEqual(widget.classIdentifier, "BusinessBaseTests.Widget");
+QUnit.test("create BusinessBase and call create", function (assert) {
+    var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+    assert.throws(function () {
+        return target.create();
+    });
+});
+
+QUnit.test("create BusinessBase and call fetch", function (assert) {
+    var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+    assert.throws(function () {
+        return target.fetch();
+    });
 });
 /// <reference path="IDataPortal.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
@@ -215,6 +195,12 @@ var Csla;
             function ServerDataPortal(scope) {
                 this.scope = scope;
             }
+            /**
+            * @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
+            * @param c The constructor of the class to create.
+            * @param parameters An optional argument containing data needed by the object for creating.
+            * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
+            */
             ServerDataPortal.prototype.createWithConstructor = function (c, parameters) {
                 var newObject = new c(this.scope, c);
                 newObject.create(parameters);
@@ -228,9 +214,10 @@ var Csla;
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
             ServerDataPortal.prototype.createWithIdentifier = function (classIdentifier, parameters) {
-                var newObject = Csla.Reflection.ReflectionHelpers.createObject(classIdentifier, this.scope);
-                newObject.create(parameters);
-                return newObject;
+                var newObject = Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope);
+                return this.createWithConstructor(newObject, parameters);
+                //newObject.create(parameters);
+                //return newObject;
             };
             return ServerDataPortal;
         })();
@@ -241,10 +228,41 @@ var Csla;
 /// <reference path="../Scripts/typings/qunit/qunit.d.ts"/>
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
 /// <reference path="../../Csla.js/Core/ServerDataPortal.ts" />
+/// <reference path="../../Csla.js/Reflection/ReflectionHelpers.ts" />
+var __extends = this.__extends || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
 QUnit.module("ServerDataPortal tests: ");
 
 var ServerDataPortalTests;
 (function (ServerDataPortalTests) {
+    var MyBusinessBase = (function (_super) {
+        __extends(MyBusinessBase, _super);
+        function MyBusinessBase() {
+            _super.apply(this, arguments);
+        }
+        MyBusinessBase.prototype.create = function (parameters) {
+            this._x = parameters;
+        };
+
+        MyBusinessBase.prototype.fetch = function (parameters) {
+            this._x = parameters * 2;
+        };
+
+        Object.defineProperty(MyBusinessBase.prototype, "x", {
+            get: function () {
+                return this._x;
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return MyBusinessBase;
+    })(Csla.Core.BusinessBase);
+    ServerDataPortalTests.MyBusinessBase = MyBusinessBase;
+
     var MyBusinessBaseWithNoOverrides = (function (_super) {
         __extends(MyBusinessBaseWithNoOverrides, _super);
         function MyBusinessBaseWithNoOverrides() {
@@ -253,68 +271,34 @@ var ServerDataPortalTests;
         return MyBusinessBaseWithNoOverrides;
     })(Csla.Core.BusinessBase);
     ServerDataPortalTests.MyBusinessBaseWithNoOverrides = MyBusinessBaseWithNoOverrides;
-
-    var MyBusinessBaseWithCreateAndNoParameters = (function (_super) {
-        __extends(MyBusinessBaseWithCreateAndNoParameters, _super);
-        function MyBusinessBaseWithCreateAndNoParameters() {
-            _super.apply(this, arguments);
-        }
-        MyBusinessBaseWithCreateAndNoParameters.prototype.create = function () {
-            this._x = 1;
-        };
-
-        Object.defineProperty(MyBusinessBaseWithCreateAndNoParameters.prototype, "x", {
-            get: function () {
-                return this._x;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        return MyBusinessBaseWithCreateAndNoParameters;
-    })(Csla.Core.BusinessBase);
-    ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters = MyBusinessBaseWithCreateAndNoParameters;
-
-    var MyBusinessBaseWithCreateAndParameters = (function (_super) {
-        __extends(MyBusinessBaseWithCreateAndParameters, _super);
-        function MyBusinessBaseWithCreateAndParameters() {
-            _super.apply(this, arguments);
-        }
-        MyBusinessBaseWithCreateAndParameters.prototype.create = function (parameters) {
-            this._x = parameters;
-        };
-
-        Object.defineProperty(MyBusinessBaseWithCreateAndParameters.prototype, "x", {
-            get: function () {
-                return this._x;
-            },
-            enumerable: true,
-            configurable: true
-        });
-        return MyBusinessBaseWithCreateAndParameters;
-    })(Csla.Core.BusinessBase);
-    ServerDataPortalTests.MyBusinessBaseWithCreateAndParameters = MyBusinessBaseWithCreateAndParameters;
 })(ServerDataPortalTests || (ServerDataPortalTests = {}));
 
-QUnit.test("create via constructor and no parameters with overload of no parameters", function (assert) {
+QUnit.test("create via constructor", function (assert) {
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
-    var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters);
-    assert.strictEqual(businessObject.x, 1);
+    var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBase, 2);
+    assert.strictEqual(businessObject.x, 2);
 });
 
-/**
-* @todo This may be another TS 0.9.5 vs. 1.0 compiler differences. This fails in the
-playground on TS's site as expected. It does not fail here.
-*/
-QUnit.test("create via constructor and parameters with overload of no parameters", function (assert) {
+QUnit.test("create via constructor with no overrides", function (assert) {
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
-    var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndNoParameters, 2);
-    assert.strictEqual(businessObject.x, 1);
+    assert.throws(function () {
+        return portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithNoOverrides, 2);
+    });
 });
 
-QUnit.test("create via constructor and parameters with overload of parameters", function (assert) {
+QUnit.test("create with class idenfitifer", function (assert) {
+    var classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ServerDataPortalTests.MyBusinessBase, ServerDataPortalTests);
     var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
-    var businessObject = portal.createWithConstructor(ServerDataPortalTests.MyBusinessBaseWithCreateAndParameters, 1);
-    assert.strictEqual(businessObject.x, 1);
+    var businessObject = portal.createWithIdentifier(classIdentifier, 2);
+    assert.strictEqual(businessObject.x, 2);
+});
+
+QUnit.test("create via class identifier with no overrides", function (assert) {
+    var classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ServerDataPortalTests.MyBusinessBaseWithNoOverrides, ServerDataPortalTests);
+    var portal = new Csla.Core.ServerDataPortal(ServerDataPortalTests);
+    assert.throws(function () {
+        return portal.createWithIdentifier(classIdentifier, 2);
+    });
 });
 /// <reference path="../Scripts/typings/qunit/qunit.d.ts"/>
 /// <reference path="../../Csla.js/Reflection/ReflectionHelpers.ts" />

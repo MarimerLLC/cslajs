@@ -14,8 +14,14 @@ module Csla {
 			constructor(private scope: Object) {
 			}
 
-			public createWithConstructor<T extends BusinessBase>(c: { new (scope: Object, ctor: Function): T; }, parameters?: Object): T {
-				var newObject = new c(this.scope, c);
+			/**
+			* @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
+			* @param ctor The constructor of the class to create.
+			* @param parameters An optional argument containing data needed by the object for creating.
+			* @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
+			*/
+			public createWithConstructor<T extends BusinessBase>(ctor: { new (scope: Object, ctor: Function): T; }, parameters?: Object): T {
+				var newObject = new ctor(this.scope, ctor);
 				newObject.create(parameters);
 				return newObject;
 			}
@@ -26,10 +32,9 @@ module Csla {
 			* @param parameters An optional argument containing data needed by the object for creating.
 			* @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
 			*/
-			public createWithIdentifier<T>(classIdentifier: string, parameters?: Object): T {
-				var newObject = Reflection.ReflectionHelpers.createObject(classIdentifier, this.scope);
-				newObject.create(parameters);
-				return newObject;
+			public createWithIdentifier(classIdentifier: string, parameters?: Object): Object {
+				return this.createWithConstructor(
+					Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope), parameters);
 			}
 		}
 	}

@@ -3,20 +3,19 @@
 
 QUnit.module("BusinessBase tests: ");
 
-var businessBaseTestsScope = {};
-
-module BusinessBaseTests {
-	export class Widget extends Csla.Core.BusinessBase {
-		constructor(scope: Object) {
-			super(scope, this.constructor);
-		}
-	}
-}
-
-businessBaseTestsScope = { BusinessBaseTests: BusinessBaseTests };
+var businessBaseTestsScope = { Csla: Csla };
 
 QUnit.test("create BusinessBase and verify classIdentifier", (assert) => {
-	var widget = new BusinessBaseTests.Widget(businessBaseTestsScope);
+	var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+	assert.strictEqual(target.classIdentifier, "Csla.Core.BusinessBase");
+});
 
-	assert.strictEqual(widget.classIdentifier, "BusinessBaseTests.Widget");
+QUnit.test("create BusinessBase and call create", (assert) => {
+	var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+	assert.throws(() => target.create());
+});
+
+QUnit.test("create BusinessBase and call fetch", (assert) => {
+	var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
+	assert.throws(() => target.fetch());
 });

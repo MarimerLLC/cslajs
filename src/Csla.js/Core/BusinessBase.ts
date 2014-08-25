@@ -29,25 +29,11 @@ module Csla {
 				throw new Error("Must implement create() in subclass.");
 			}
 
-			///**
-			//* @summary Allows the object to initialize object state from a JSON serialization string.
-			//* @param obj The deserialized object.
-			//* @param replacements An optional object containing keys and corresponding constructor functions
-			//specifying which fields on the current object should be created and initialized with the deserialized value.
-			//*/
-			//deserialize(obj: Object, replacements?: any) {
-			//	for (var key in obj) {
-			//		if (replacements && replacements.hasOwnProperty(key)) {
-			//			var targetValue = <BusinessBase>replacements[key];
-			//			targetValue.deserialize(obj[key]);
-			//			this[key] = targetValue;
-			//		}
-			//		else {
-			//			this[key] = obj[key];
-			//		}
-			//	}
-			//}
-
+			/**
+			* @summary Allows the object to initialize object state from a JSON serialization string.
+			* @param obj The deserialized object.
+			* @param scope The scope to use to create objects if necessary.
+			*/
 			deserialize(obj: Object, scope: Object) {
 				for (var key in obj) {
 					var value = obj[key];

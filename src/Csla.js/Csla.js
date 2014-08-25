@@ -109,24 +109,11 @@ var Csla;
                 throw new Error("Must implement create() in subclass.");
             };
 
-            ///**
-            //* @summary Allows the object to initialize object state from a JSON serialization string.
-            //* @param obj The deserialized object.
-            //* @param replacements An optional object containing keys and corresponding constructor functions
-            //specifying which fields on the current object should be created and initialized with the deserialized value.
-            //*/
-            //deserialize(obj: Object, replacements?: any) {
-            //	for (var key in obj) {
-            //		if (replacements && replacements.hasOwnProperty(key)) {
-            //			var targetValue = <BusinessBase>replacements[key];
-            //			targetValue.deserialize(obj[key]);
-            //			this[key] = targetValue;
-            //		}
-            //		else {
-            //			this[key] = obj[key];
-            //		}
-            //	}
-            //}
+            /**
+            * @summary Allows the object to initialize object state from a JSON serialization string.
+            * @param obj The deserialized object.
+            * @param scope The scope to use to create objects if necessary.
+            */
             BusinessBase.prototype.deserialize = function (obj, scope) {
                 for (var key in obj) {
                     var value = obj[key];
@@ -199,8 +186,14 @@ var Csla;
             function ServerDataPortal(scope) {
                 this.scope = scope;
             }
-            ServerDataPortal.prototype.createWithConstructor = function (c, parameters) {
-                var newObject = new c(this.scope, c);
+            /**
+            * @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
+            * @param ctor The constructor of the class to create.
+            * @param parameters An optional argument containing data needed by the object for creating.
+            * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
+            */
+            ServerDataPortal.prototype.createWithConstructor = function (ctor, parameters) {
+                var newObject = new ctor(this.scope, ctor);
                 newObject.create(parameters);
                 return newObject;
             };
@@ -212,9 +205,7 @@ var Csla;
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
             ServerDataPortal.prototype.createWithIdentifier = function (classIdentifier, parameters) {
-                var newObject = Csla.Reflection.ReflectionHelpers.createObject(classIdentifier, this.scope);
-                newObject.create(parameters);
-                return newObject;
+                return this.createWithConstructor(Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope), parameters);
             };
             return ServerDataPortal;
         })();

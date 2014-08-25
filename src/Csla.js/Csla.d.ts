@@ -1,4 +1,4 @@
-declare module Csla {
+﻿declare module Csla {
     module Reflection {
         /**
         * @summary Contains a number of functions to perform reflection-based features.
@@ -71,6 +71,11 @@ declare module Csla {
             of being part of the data portal operation pipeline.
             */
             public create(parameters?: Object): void;
+            /**
+            * @summary Allows the object to initialize object state from a JSON serialization string.
+            * @param obj The deserialized object.
+            * @param scope The scope to use to create objects if necessary.
+            */
             public deserialize(obj: Object, scope: Object): void;
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "fetch" operation on the object.
@@ -132,14 +137,20 @@ declare module Csla {
             * @param scope A scope to use to resolve objects via an identifier.
             */
             constructor(scope: Object);
-            public createWithConstructor<T extends BusinessBase>(c: new(scope: Object, ctor: Function) => T, parameters?: Object): T;
+            /**
+            * @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
+            * @param ctor The constructor of the class to create.
+            * @param parameters An optional argument containing data needed by the object for creating.
+            * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
+            */
+            public createWithConstructor<T extends BusinessBase>(ctor: new(scope: Object, ctor: Function) => T, parameters?: Object): T;
             /**
             * @summary Creates an instance of the class defined by an identifier, passing in parameters if they exist.
             * @param classIdentifier The name of the specific {@link Csla.Core.BusinessBase} class to create.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
-            public createWithIdentifier<T>(classIdentifier: string, parameters?: Object): T;
+            public createWithIdentifier(classIdentifier: string, parameters?: Object): Object;
         }
     }
 }
