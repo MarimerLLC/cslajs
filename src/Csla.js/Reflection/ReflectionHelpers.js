@@ -8,6 +8,16 @@ var Csla;
             function ReflectionHelpers() {
             }
             /**
+            * @summary Creates an object based on an identifier and a scope.
+            * @param objectIdentifer The identifier of the class.
+            * @param scope The scope to use to find the constructor and thereby create the object.
+            * @returns A new object, or a thrown error if it could not be found.
+            */
+            ReflectionHelpers.createObject = function (classIdentifier, scope) {
+                return new (ReflectionHelpers.getConstructorFunction(classIdentifier, scope))();
+            };
+
+            /**
             * @summary Recursively looks for a constructor function based on a given object's scope.
             * @param obj The object to find the constructor function on.
             * @param f The function to look for.
@@ -37,12 +47,33 @@ var Csla;
             };
 
             /**
+            * @summary Gets the constructor function for an object specified by an identifier within a scope.
+            * @param objectIdentifer The identifier of the class.
+            * @param scope The scope to use to find the constructor.
+            * @returns The constructor function, or a thrown error if it could not be found.
+            */
+            ReflectionHelpers.getConstructorFunction = function (classIdentifier, scope) {
+                var typeNameParts = classIdentifier.split(".");
+
+                var constructorFunction = scope;
+                for (var i = 0; i < typeNameParts.length; i++) {
+                    constructorFunction = constructorFunction[typeNameParts[i]];
+                }
+
+                if (typeof constructorFunction !== "function") {
+                    throw new Error("Constructor for " + classIdentifier + " not found.");
+                }
+
+                return constructorFunction;
+            };
+
+            /**
             * @summary Creates an indentifier based on a given constructor function and a scope.
             * @param f The constructor function to get the full class name for.
             * @param scope The scope to use to create the identifier.
             * @returns The full name of the class that has the constructor function, or null if it could not be found.
             */
-            ReflectionHelpers.getObjectIdentifier = function (f, scope) {
+            ReflectionHelpers.getClassIdentifier = function (f, scope) {
                 return ReflectionHelpers.findConstructor(scope, f, new Array());
             };
             return ReflectionHelpers;
