@@ -97,7 +97,23 @@ var Csla;
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
             function BusinessBase(scope, ctor) {
+                this._isLoading = false;
+                this._isDirty = false;
                 this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+
+                // Object.keys gets all members of a class; this gets just the properties.
+                var props = Object.keys(this).map(function (key) {
+                    if (typeof this[key] !== "function") {
+                        return key;
+                    }
+                });
+                props.forEach(function (prop) {
+                    // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
+                    // property names.
+                    if (prop.substring(0, 2) === "__") {
+                        this[prop] = prop.substring(2);
+                    }
+                });
             }
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
@@ -115,6 +131,7 @@ var Csla;
             * @param scope The scope to use to create objects if necessary.
             */
             BusinessBase.prototype.deserialize = function (obj, scope) {
+                this._isLoading = true;
                 for (var key in obj) {
                     var value = obj[key];
 
@@ -127,6 +144,7 @@ var Csla;
                         this[key] = value;
                     }
                 }
+                this._isLoading = false;
             };
 
             /**
@@ -149,6 +167,60 @@ var Csla;
                 enumerable: true,
                 configurable: true
             });
+
+            Object.defineProperty(BusinessBase.prototype, "isDirty", {
+                /**
+                * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
+                * @returns {Boolean}
+                */
+                get: function () {
+                    return this._isDirty;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isLoading", {
+                /**
+                * @summary Indicates whether the object is currently being loaded.
+                * @returns {Boolean}
+                */
+                set: function (value) {
+                    this._isLoading = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            /**
+            * @summary Gets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @example
+            * public get property(): number {
+            *   return this.getProperty(this.__property);
+            * }
+            */
+            BusinessBase.prototype.getProperty = function (name) {
+                return this[name];
+            };
+
+            /**
+            * @summary Sets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * This will flag the parent object as dirty if the objecct is not loading, and the value differs from the original.
+            * @param value {any} The value to set.
+            * @example
+            * public set property(value: number) {
+            *   this.setProperty(this.__property, value);
+            * }
+            */
+            BusinessBase.prototype.setProperty = function (name, value) {
+                if (!this._isLoading && this[name] !== value) {
+                    this._isDirty = true;
+                }
+
+                this[name] = value;
+            };
             return BusinessBase;
         })();
         Core.BusinessBase = BusinessBase;
@@ -157,9 +229,39 @@ var Csla;
 })(Csla || (Csla = {}));
 /// <reference path="../Scripts/typings/qunit/qunit.d.ts" />
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
+var __extends = this.__extends || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
 QUnit.module("BusinessBase tests: ");
 
 var businessBaseTestsScope = { Csla: Csla };
+
+var Child = (function (_super) {
+    __extends(Child, _super);
+    function Child() {
+        _super.apply(this, arguments);
+    }
+    Child.prototype.create = function (parameters) {
+        this.isLoading = true;
+        this.childProp = parameters;
+        this.isLoading = false;
+    };
+
+    Object.defineProperty(Child.prototype, "childProp", {
+        get: function () {
+            return this.getProperty(this.__childProp);
+        },
+        set: function (value) {
+            this.setProperty(this.__childProp, value);
+        },
+        enumerable: true,
+        configurable: true
+    });
+    return Child;
+})(Csla.Core.BusinessBase);
 
 QUnit.test("create BusinessBase and verify classIdentifier", function (assert) {
     var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
@@ -179,6 +281,30 @@ QUnit.test("create BusinessBase and call fetch", function (assert) {
         return target.fetch();
     });
 });
+
+QUnit.test("create child and ensure it is not dirty by default", function (assert) {
+    var target = new Child(businessBaseTestsScope, Child.constructor);
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty by default');
+});
+
+QUnit.test("create child, call create, and ensure it is not dirty by default", function (assert) {
+    var target = new Child(businessBaseTestsScope, Child.constructor);
+    target.create(1);
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty after create');
+});
+
+QUnit.test("create child and ensure setting a property makes it dirty", function (assert) {
+    var target = new Child(businessBaseTestsScope, Child.constructor);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, true, 'child was not made dirty by setting a property');
+});
+
+QUnit.test("create child, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
+    var target = new Child(businessBaseTestsScope, Child.constructor);
+    target.create(1);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty by setting a property to the existing value');
+});
 /// <reference path="IDataPortal.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 var Csla;
@@ -197,12 +323,12 @@ var Csla;
             }
             /**
             * @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
-            * @param c The constructor of the class to create.
+            * @param ctor The constructor of the class to create.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
-            ServerDataPortal.prototype.createWithConstructor = function (c, parameters) {
-                var newObject = new c(this.scope, c);
+            ServerDataPortal.prototype.createWithConstructor = function (ctor, parameters) {
+                var newObject = new ctor(this.scope, ctor);
                 newObject.create(parameters);
                 return newObject;
             };
@@ -214,10 +340,7 @@ var Csla;
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
             ServerDataPortal.prototype.createWithIdentifier = function (classIdentifier, parameters) {
-                var newObject = Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope);
-                return this.createWithConstructor(newObject, parameters);
-                //newObject.create(parameters);
-                //return newObject;
+                return this.createWithConstructor(Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope), parameters);
             };
             return ServerDataPortal;
         })();
@@ -229,12 +352,6 @@ var Csla;
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
 /// <reference path="../../Csla.js/Core/ServerDataPortal.ts" />
 /// <reference path="../../Csla.js/Reflection/ReflectionHelpers.ts" />
-var __extends = this.__extends || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
-};
 QUnit.module("ServerDataPortal tests: ");
 
 var ServerDataPortalTests;

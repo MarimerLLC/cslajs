@@ -58,6 +58,8 @@ declare module Csla {
         */
         class BusinessBase implements Serialization.IDeserialization {
             private _classIdentifier;
+            private _isLoading;
+            private _isDirty;
             /**
             * @summary Creates an instance of the class.
             * @param scope The scope to use to calculate the class identifier.
@@ -88,6 +90,36 @@ declare module Csla {
             * @summary Gets the class identifier for this object calculated from the scope given on construction.
             */
             public classIdentifier : string;
+            /**
+            * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
+            * @returns {Boolean}
+            */
+            public isDirty : boolean;
+            /**
+            * @summary Indicates whether the object is currently being loaded.
+            * @returns {Boolean}
+            */
+            public isLoading : boolean;
+            /**
+            * @summary Gets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @example
+            * public get property(): number {
+            *   return this.getProperty(this.__property);
+            * }
+            */
+            public getProperty(name: string): any;
+            /**
+            * @summary Sets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * This will flag the parent object as dirty if the objecct is not loading, and the value differs from the original.
+            * @param value {any} The value to set.
+            * @example
+            * public set property(value: number) {
+            *   this.setProperty(this.__property, value);
+            * }
+            */
+            public setProperty(name: string, value: any): void;
         }
     }
 }

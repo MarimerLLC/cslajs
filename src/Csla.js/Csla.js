@@ -97,7 +97,23 @@ var Csla;
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
             function BusinessBase(scope, ctor) {
+                this._isLoading = false;
+                this._isDirty = false;
                 this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+
+                // Object.keys gets all members of a class; this gets just the properties.
+                var props = Object.keys(this).map(function (key) {
+                    if (typeof this[key] !== "function") {
+                        return key;
+                    }
+                });
+                props.forEach(function (prop) {
+                    // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
+                    // property names.
+                    if (prop.substring(0, 2) === "__") {
+                        this[prop] = prop.substring(2);
+                    }
+                });
             }
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
@@ -115,6 +131,7 @@ var Csla;
             * @param scope The scope to use to create objects if necessary.
             */
             BusinessBase.prototype.deserialize = function (obj, scope) {
+                this._isLoading = true;
                 for (var key in obj) {
                     var value = obj[key];
 
@@ -127,6 +144,7 @@ var Csla;
                         this[key] = value;
                     }
                 }
+                this._isLoading = false;
             };
 
             /**
@@ -149,6 +167,60 @@ var Csla;
                 enumerable: true,
                 configurable: true
             });
+
+            Object.defineProperty(BusinessBase.prototype, "isDirty", {
+                /**
+                * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
+                * @returns {Boolean}
+                */
+                get: function () {
+                    return this._isDirty;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isLoading", {
+                /**
+                * @summary Indicates whether the object is currently being loaded.
+                * @returns {Boolean}
+                */
+                set: function (value) {
+                    this._isLoading = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            /**
+            * @summary Gets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @example
+            * public get property(): number {
+            *   return this.getProperty(this.__property);
+            * }
+            */
+            BusinessBase.prototype.getProperty = function (name) {
+                return this[name];
+            };
+
+            /**
+            * @summary Sets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * This will flag the parent object as dirty if the objecct is not loading, and the value differs from the original.
+            * @param value {any} The value to set.
+            * @example
+            * public set property(value: number) {
+            *   this.setProperty(this.__property, value);
+            * }
+            */
+            BusinessBase.prototype.setProperty = function (name, value) {
+                if (!this._isLoading && this[name] !== value) {
+                    this._isDirty = true;
+                }
+
+                this[name] = value;
+            };
             return BusinessBase;
         })();
         Core.BusinessBase = BusinessBase;
