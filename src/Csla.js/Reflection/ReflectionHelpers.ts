@@ -10,9 +10,10 @@ module Csla {
 			* @param scope The scope to use to find the constructor and thereby create the object.
 			* @returns A new object, or a thrown error if it could not be found.
 			*/
-			public static createObject(classIdentifier: string, scope: Object): any {
-				return new (ReflectionHelpers.getConstructorFunction(
-					classIdentifier, scope))();
+      public static createObject(classIdentifier: string, scope: Object): any {
+        var ctor = ReflectionHelpers.getConstructorFunction(classIdentifier, scope);
+        var obj = new ctor(scope, ctor);
+				return obj;
 			}
 
 			/**

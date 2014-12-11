@@ -14,7 +14,9 @@
             * @returns A new object, or a thrown error if it could not be found.
             */
             ReflectionHelpers.createObject = function (classIdentifier, scope) {
-                return new (ReflectionHelpers.getConstructorFunction(classIdentifier, scope))();
+                var ctor = ReflectionHelpers.getConstructorFunction(classIdentifier, scope);
+                var obj = new ctor(scope, ctor);
+                return obj;
             };
 
             /**
@@ -99,11 +101,16 @@ var Csla;
             function BusinessBase(scope, ctor) {
                 this._isLoading = false;
                 this._isDirty = false;
+                this._backer = {};
+                this.init(scope, ctor);
+            }
+            BusinessBase.prototype.init = function (scope, ctor) {
                 this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+                var self = this;
 
                 // Object.keys gets all members of a class; this gets just the properties.
                 var props = Object.keys(this).map(function (key) {
-                    if (typeof this[key] !== "function") {
+                    if (typeof self[key] !== "function") {
                         return key;
                     }
                 });
@@ -111,10 +118,11 @@ var Csla;
                     // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
                     // property names.
                     if (prop.substring(0, 2) === "__") {
-                        this[prop] = prop.substring(2);
+                        self[prop] = prop.substring(2);
                     }
                 });
-            }
+            };
+
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
@@ -134,12 +142,16 @@ var Csla;
                 this._isLoading = true;
                 for (var key in obj) {
                     var value = obj[key];
-
-                    if (value.hasOwnProperty("_classIdentifier")) {
-                        // This is an object that is a BusinessBase. Create it, and deserialize.
-                        var targetValue = Csla.Reflection.ReflectionHelpers.createObject(value["_classIdentifier"], scope);
-                        targetValue.deserialize(value, scope);
-                        this[key] = targetValue;
+                    if (key === '_backer') {
+                        this[key] = value;
+                        for (var subkey in value) {
+                            if (value[subkey].hasOwnProperty("_classIdentifier")) {
+                                // This is an object that is a BusinessBase. Create it, and deserialize.
+                                var targetValue = Csla.Reflection.ReflectionHelpers.createObject(value[subkey]["_classIdentifier"], scope);
+                                targetValue.deserialize(value[subkey], scope);
+                                this[key][subkey] = targetValue;
+                            }
+                        }
                     } else {
                         this[key] = value;
                     }
@@ -201,13 +213,31 @@ var Csla;
             * }
             */
             BusinessBase.prototype.getProperty = function (name) {
-                return this[name];
+                return this._backer[name];
+            };
+
+            BusinessBase.prototype._sameValue = function (value1, value2) {
+                if (value1 === undefined) {
+                    return value2 === undefined;
+                }
+                if (value1 === null) {
+                    return value2 === null;
+                }
+                if (typeof value1 === typeof value2) {
+                    if (typeof value1 === "number" && isNaN(value1) !== isNaN(value2)) {
+                        return false;
+                    }
+                    return value1 === value2;
+                }
+
+                // Allow coercion where necessary.
+                return value1 == value2;
             };
 
             /**
             * @summary Sets the value of a property.
             * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
-            * This will flag the parent object as dirty if the objecct is not loading, and the value differs from the original.
+            * This will flag the parent object as dirty if the object is not loading, and the value differs from the original.
             * @param value {any} The value to set.
             * @example
             * public set property(value: number) {
@@ -215,11 +245,11 @@ var Csla;
             * }
             */
             BusinessBase.prototype.setProperty = function (name, value) {
-                if (!this._isLoading && this[name] !== value) {
+                if (!this._isLoading && !this._sameValue(this._backer[name], value)) {
                     this._isDirty = true;
                 }
 
-                this[name] = value;
+                this._backer[name] = value;
             };
             return BusinessBase;
         })();
@@ -239,29 +269,66 @@ QUnit.module("BusinessBase tests: ");
 
 var businessBaseTestsScope = { Csla: Csla };
 
-var Child = (function (_super) {
-    __extends(Child, _super);
-    function Child() {
-        _super.apply(this, arguments);
-    }
-    Child.prototype.create = function (parameters) {
-        this.isLoading = true;
-        this.childProp = parameters;
-        this.isLoading = false;
-    };
+var SubclassTests;
+(function (SubclassTests) {
+    var Child = (function (_super) {
+        __extends(Child, _super);
+        function Child(scope, ctor) {
+            _super.call(this, scope, ctor);
+            this.__childProp = null;
+            this.init(scope, ctor);
+        }
+        Child.prototype.create = function (parameters) {
+            this.isLoading = true;
+            this.childProp = parameters;
+            this.isLoading = false;
+        };
 
-    Object.defineProperty(Child.prototype, "childProp", {
-        get: function () {
-            return this.getProperty(this.__childProp);
-        },
-        set: function (value) {
-            this.setProperty(this.__childProp, value);
-        },
-        enumerable: true,
-        configurable: true
-    });
-    return Child;
-})(Csla.Core.BusinessBase);
+        Object.defineProperty(Child.prototype, "childProp", {
+            get: function () {
+                return this.getProperty(this.__childProp);
+            },
+            set: function (value) {
+                this.setProperty(this.__childProp, value);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return Child;
+    })(Csla.Core.BusinessBase);
+    SubclassTests.Child = Child;
+
+    var Grandchild = (function (_super) {
+        __extends(Grandchild, _super);
+        function Grandchild(scope, ctor) {
+            _super.call(this, scope, ctor);
+            this.__grandchildProp = null;
+            this.init(scope, ctor);
+        }
+        Grandchild.prototype.create = function (parameters) {
+            this.isLoading = true;
+            this.childProp = parameters.childProp;
+            this.grandchildProp = parameters.grandchildProp;
+            this.isLoading = false;
+        };
+
+        Object.defineProperty(Grandchild.prototype, "grandchildProp", {
+            get: function () {
+                return this.getProperty(this.__grandchildProp);
+            },
+            set: function (value) {
+                this.setProperty(this.__grandchildProp, value);
+            },
+            enumerable: true,
+            configurable: true
+        });
+
+        return Grandchild;
+    })(Child);
+    SubclassTests.Grandchild = Grandchild;
+})(SubclassTests || (SubclassTests = {}));
+
+var subclassTestsScope = { SubclassTests: SubclassTests };
 
 QUnit.test("create BusinessBase and verify classIdentifier", function (assert) {
     var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
@@ -283,27 +350,64 @@ QUnit.test("create BusinessBase and call fetch", function (assert) {
 });
 
 QUnit.test("create child and ensure it is not dirty by default", function (assert) {
-    var target = new Child(businessBaseTestsScope, Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
     assert.strictEqual(target.isDirty, false, 'child should not be dirty by default');
 });
 
 QUnit.test("create child, call create, and ensure it is not dirty by default", function (assert) {
-    var target = new Child(businessBaseTestsScope, Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
     target.create(1);
     assert.strictEqual(target.isDirty, false, 'child should not be dirty after create');
 });
 
 QUnit.test("create child and ensure setting a property makes it dirty", function (assert) {
-    var target = new Child(businessBaseTestsScope, Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
     target.childProp = 1;
     assert.strictEqual(target.isDirty, true, 'child was not made dirty by setting a property');
 });
 
 QUnit.test("create child, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
-    var target = new Child(businessBaseTestsScope, Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
     target.create(1);
     target.childProp = 1;
     assert.strictEqual(target.isDirty, false, 'child should not be dirty by setting a property to the existing value');
+});
+
+QUnit.test("create grandchild and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by default');
+});
+
+QUnit.test("create grandchild, call create, and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    target.create({ childProp: 1, granchildProp: "hello" });
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty after create');
+});
+
+QUnit.test("create grandchild and ensure setting a property makes it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    target.grandchildProp = "hello";
+    assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a property');
+});
+
+QUnit.test("create grandchild and ensure setting a parent property makes it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a parent property');
+});
+
+QUnit.test("create grandchild, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    target.create({ childProp: 1, grandchildProp: "hello" });
+    target.grandchildProp = "hello";
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a property to the existing value');
+});
+
+QUnit.test("create grandchild, call create, and ensure setting a parent property to the same value does not make it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    target.create({ childProp: 1, grandchildProp: "hello" });
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a parent property to the existing value');
 });
 /// <reference path="IDataPortal.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
@@ -531,6 +635,7 @@ var Csla;
 
             Serializer.prototype.deserialize = function (text, c, scope) {
                 var result = new c(scope, c);
+                result.init(scope, result.constructor);
                 result.deserialize(JSON.parse(text), scope);
                 return result;
             };
@@ -553,13 +658,15 @@ var SerializationTests;
         __extends(Age, _super);
         function Age(scope) {
             _super.call(this, scope, this.constructor);
+            this.__value = null;
+            this.init(scope, this.constructor);
         }
         Object.defineProperty(Age.prototype, "value", {
             get: function () {
-                return this._value;
+                return this.getProperty(this.__value);
             },
             set: function (value) {
-                this._value = value;
+                this.setProperty(this.__value, value);
             },
             enumerable: true,
             configurable: true
@@ -573,13 +680,17 @@ var SerializationTests;
         __extends(Person, _super);
         function Person(scope) {
             _super.call(this, scope, this.constructor);
+            this.__firstName = null;
+            this.__lastName = null;
+            this.__age = null;
+            this.init(scope, this.constructor);
         }
         Object.defineProperty(Person.prototype, "age", {
             get: function () {
-                return this._age;
+                return this.getProperty(this.__age);
             },
             set: function (value) {
-                this._age = value;
+                this.setProperty(this.__age, value);
             },
             enumerable: true,
             configurable: true
@@ -588,10 +699,10 @@ var SerializationTests;
 
         Object.defineProperty(Person.prototype, "firstName", {
             get: function () {
-                return this._firstName;
+                return this.getProperty(this.__firstName);
             },
             set: function (value) {
-                this._firstName = value;
+                this.setProperty(this.__firstName, value);
             },
             enumerable: true,
             configurable: true
@@ -600,10 +711,10 @@ var SerializationTests;
 
         Object.defineProperty(Person.prototype, "lastName", {
             get: function () {
-                return this._lastName;
+                return this.getProperty(this.__lastName);
             },
             set: function (value) {
-                this._lastName = value;
+                this.setProperty(this.__lastName, value);
             },
             enumerable: true,
             configurable: true

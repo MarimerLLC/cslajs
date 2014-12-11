@@ -61,6 +61,7 @@
   </PropertyGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Core\BusinessBase.ts" />
+    <TypeScriptCompile Include="Core\Configuration.ts" />
     <TypeScriptCompile Include="Core\DataPortalConfiguration.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortal.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpers.ts" />

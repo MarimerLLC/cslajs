@@ -8,52 +8,58 @@ var serializationTestsScope = { };
 
 module SerializationTests {
 	export class Age extends Csla.Core.BusinessBase {
-		private _value: number;
+		private __value: string;
 
 		constructor(scope: Object) {
-			super(scope, this.constructor);
+      super(scope, this.constructor);
+      this.__value = null;
+      this.init(scope, this.constructor);
 		}
 
 		public get value(): number {
-			return this._value;
+      return this.getProperty(this.__value);
 		}
 
 		public set value(value: number) {
-			this._value = value;
+      this.setProperty(this.__value, value);
 		}
 	}
 
 	export class Person extends Csla.Core.BusinessBase {
-		private _firstName: string;
-		private _lastName: string;
-		private _age: Age;
+		private __firstName: string;
+		private __lastName: string;
+		private __age: string;
 
 		constructor(scope: Object) {
-			super(scope, this.constructor);
+      super(scope, this.constructor);
+      this.__firstName = null;
+      this.__lastName = null;
+      this.__age = null;
+      this.init(scope, this.constructor);
 		}
 
 		public get age(): Age {
-			return this._age;
+      return this.getProperty(this.__age);
 		}
 
 		public set age(value: Age) {
-			this._age = value;
+      this.setProperty(this.__age, value);
 		}
 
 		public get firstName(): string {
-			return this._firstName;
+      return this.getProperty(this.__firstName);
 		}
 
 		public set firstName(value: string) {
-			this._firstName = value;
+      this.setProperty(this.__firstName, value);
 		}
 
 		public get lastName(): string {
-			return this._lastName;
+      return this.getProperty(this.__lastName);
 		}
 
 		public set lastName(value: string) {
-			this._lastName = value;
+      this.setProperty(this.__lastName, value);
 		}
 	}
 }
@@ -61,7 +67,7 @@ module SerializationTests {
 serializationTestsScope = { SerializationTests: SerializationTests };
 
 QUnit.test("serialization roundtrip with BusinessBase that contains BusinessBase", (assert) => {
-	var person = new SerializationTests.Person(serializationTestsScope);
+  var person = new SerializationTests.Person(serializationTestsScope);
 	person.firstName = "Jane";
 	person.lastName = "Smith";
 	var personAge = new SerializationTests.Age(serializationTestsScope);
@@ -76,7 +82,7 @@ QUnit.test("serialization roundtrip with BusinessBase that contains BusinessBase
 	assert.strictEqual(deserializedPerson.age.value, 40);
 	assert.strictEqual(deserializedPerson.firstName, "Jane");
 	assert.strictEqual(deserializedPerson.lastName, "Smith");
-});
+  });
 
 QUnit.test("serialization roundtrip with BusinessBase", (assert) => {
 	var age = new SerializationTests.Age(serializationTestsScope);
