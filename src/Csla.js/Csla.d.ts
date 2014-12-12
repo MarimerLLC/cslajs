@@ -1,4 +1,4 @@
-﻿declare module Csla {
+declare module Csla {
     module Reflection {
         /**
         * @summary Contains a number of functions to perform reflection-based features.
@@ -48,6 +48,16 @@ declare module Csla {
             * @param scope The scope to use to create and deserialize objects.
             */
             deserialize(obj: Object, scope: Object): any;
+        }
+    }
+}
+declare module Csla {
+    module Core {
+        class Configuration {
+            private static _isLoaded;
+            private static _propertyBackingFieldPrefix;
+            private static load();
+            static propertyBackingFieldPrefix : string;
         }
     }
 }
@@ -110,7 +120,8 @@ declare module Csla {
             public isLoading : boolean;
             /**
             * @summary Gets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
             * @example
             * public get property(): number {
             *   return this.getProperty(this.__property);
@@ -120,8 +131,9 @@ declare module Csla {
             private _sameValue(value1, value2);
             /**
             * @summary Sets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
-            * This will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method
+            * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
             * @param value {any} The value to set.
             * @example
             * public set property(value: number) {
@@ -129,18 +141,6 @@ declare module Csla {
             * }
             */
             public setProperty(name: string, value: any): void;
-        }
-    }
-}
-declare module Csla {
-    module Core {
-        class Configuration {
-            private static _instance;
-            private _propertyBackingFieldPrefix;
-            constructor();
-            private load();
-            public propertyBackingFieldPrefix : string;
-            static Instance : Configuration;
         }
     }
 }

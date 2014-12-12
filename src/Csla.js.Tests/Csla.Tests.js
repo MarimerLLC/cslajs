@@ -27,14 +27,22 @@
             * @description For more details on how this works, see http://stackoverflow.com/questions/332422/how-do-i-get-the-name-of-an-objects-type-in-javascript.
             */
             ReflectionHelpers.findConstructor = function (obj, f, names) {
+                if (names.length > 20) {
+                    if (console && console.warn) {
+                        console.warn("namespace depth was greater than 20, giving up at: " + names.join("."));
+                        return null;
+                    }
+                }
                 for (var key in obj) {
                     if (obj.hasOwnProperty(key)) {
                         names.push(key);
-
                         if (obj[key] === f) {
                             return names.join(".");
                         } else {
-                            var result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            var result = null;
+                            if (typeof obj[key] === 'object') {
+                                result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            }
 
                             if (result === null) {
                                 names.pop();
@@ -84,8 +92,39 @@
     })(Csla.Reflection || (Csla.Reflection = {}));
     var Reflection = Csla.Reflection;
 })(Csla || (Csla = {}));
+var Csla;
+(function (Csla) {
+    (function (Core) {
+        var Configuration = (function () {
+            function Configuration() {
+            }
+            Configuration.load = function () {
+                if (Csla.Core.Configuration._isLoaded) {
+                    return;
+                }
+
+                // Do some kind of magic here to load a json file or something
+                Csla.Core.Configuration._propertyBackingFieldPrefix = "__";
+                Csla.Core.Configuration._isLoaded = true;
+            };
+
+            Object.defineProperty(Configuration, "propertyBackingFieldPrefix", {
+                get: function () {
+                    Csla.Core.Configuration.load();
+                    return Csla.Core.Configuration._propertyBackingFieldPrefix;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            return Configuration;
+        })();
+        Core.Configuration = Configuration;
+    })(Csla.Core || (Csla.Core = {}));
+    var Core = Csla.Core;
+})(Csla || (Csla = {}));
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
+/// <reference path="Configuration.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -104,6 +143,12 @@ var Csla;
                 this._backer = {};
                 this.init(scope, ctor);
             }
+            /**
+            * @summary Initializes the classIdenitifer and backing metadata properties. Must be called in the
+            * constructor of any class extending BusinessBase.
+            * @param scope The scope to use to calculate the class identifier.
+            * @param ctor The constructor used (subclasses should pass in their constructor).
+            */
             BusinessBase.prototype.init = function (scope, ctor) {
                 this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
                 var self = this;
@@ -114,10 +159,11 @@ var Csla;
                         return key;
                     }
                 });
+                var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
                 props.forEach(function (prop) {
                     // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
                     // property names.
-                    if (prop.substring(0, 2) === "__") {
+                    if (prop.substring(0, 2) === prefix) {
                         self[prop] = prop.substring(2);
                     }
                 });
@@ -127,7 +173,7 @@ var Csla;
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             BusinessBase.prototype.create = function (parameters) {
                 throw new Error("Must implement create() in subclass.");
@@ -142,6 +188,8 @@ var Csla;
                 this._isLoading = true;
                 for (var key in obj) {
                     var value = obj[key];
+
+                    // All BusinessBase objects will have a _backer field holding the values of the exposed properties, so deserialize those.
                     if (key === '_backer') {
                         this[key] = value;
                         for (var subkey in value) {
@@ -163,7 +211,7 @@ var Csla;
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "fetch" operation on the object.
             * @param parameters An optional argument containing data needed by the object for fetching.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             BusinessBase.prototype.fetch = function (parameters) {
                 throw new Error("Must implement fetch() in subclass.");
@@ -206,7 +254,8 @@ var Csla;
 
             /**
             * @summary Gets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
             * @example
             * public get property(): number {
             *   return this.getProperty(this.__property);
@@ -236,8 +285,9 @@ var Csla;
 
             /**
             * @summary Sets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
-            * This will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method
+            * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
             * @param value {any} The value to set.
             * @example
             * public set property(value: number) {
@@ -350,61 +400,61 @@ QUnit.test("create BusinessBase and call fetch", function (assert) {
 });
 
 QUnit.test("create child and ensure it is not dirty by default", function (assert) {
-    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
     assert.strictEqual(target.isDirty, false, 'child should not be dirty by default');
 });
 
 QUnit.test("create child, call create, and ensure it is not dirty by default", function (assert) {
-    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
     target.create(1);
     assert.strictEqual(target.isDirty, false, 'child should not be dirty after create');
 });
 
 QUnit.test("create child and ensure setting a property makes it dirty", function (assert) {
-    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
     target.childProp = 1;
     assert.strictEqual(target.isDirty, true, 'child was not made dirty by setting a property');
 });
 
 QUnit.test("create child, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
-    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
     target.create(1);
     target.childProp = 1;
     assert.strictEqual(target.isDirty, false, 'child should not be dirty by setting a property to the existing value');
 });
 
 QUnit.test("create grandchild and ensure it is not dirty by default", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by default');
 });
 
 QUnit.test("create grandchild, call create, and ensure it is not dirty by default", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     target.create({ childProp: 1, granchildProp: "hello" });
     assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty after create');
 });
 
 QUnit.test("create grandchild and ensure setting a property makes it dirty", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     target.grandchildProp = "hello";
     assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a property');
 });
 
 QUnit.test("create grandchild and ensure setting a parent property makes it dirty", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     target.childProp = 1;
     assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a parent property');
 });
 
 QUnit.test("create grandchild, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     target.create({ childProp: 1, grandchildProp: "hello" });
     target.grandchildProp = "hello";
     assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a property to the existing value');
 });
 
 QUnit.test("create grandchild, call create, and ensure setting a parent property to the same value does not make it dirty", function (assert) {
-    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
     target.create({ childProp: 1, grandchildProp: "hello" });
     target.childProp = 1;
     assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a parent property to the existing value');

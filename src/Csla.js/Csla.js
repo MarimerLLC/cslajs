@@ -27,14 +27,22 @@
             * @description For more details on how this works, see http://stackoverflow.com/questions/332422/how-do-i-get-the-name-of-an-objects-type-in-javascript.
             */
             ReflectionHelpers.findConstructor = function (obj, f, names) {
+                if (names.length > 20) {
+                    if (console && console.warn) {
+                        console.warn("namespace depth was greater than 20, giving up at: " + names.join("."));
+                        return null;
+                    }
+                }
                 for (var key in obj) {
                     if (obj.hasOwnProperty(key)) {
                         names.push(key);
-
                         if (obj[key] === f) {
                             return names.join(".");
                         } else {
-                            var result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            var result = null;
+                            if (typeof obj[key] === 'object') {
+                                result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            }
 
                             if (result === null) {
                                 names.pop();
@@ -84,8 +92,39 @@
     })(Csla.Reflection || (Csla.Reflection = {}));
     var Reflection = Csla.Reflection;
 })(Csla || (Csla = {}));
+var Csla;
+(function (Csla) {
+    (function (Core) {
+        var Configuration = (function () {
+            function Configuration() {
+            }
+            Configuration.load = function () {
+                if (Csla.Core.Configuration._isLoaded) {
+                    return;
+                }
+
+                // Do some kind of magic here to load a json file or something
+                Csla.Core.Configuration._propertyBackingFieldPrefix = "__";
+                Csla.Core.Configuration._isLoaded = true;
+            };
+
+            Object.defineProperty(Configuration, "propertyBackingFieldPrefix", {
+                get: function () {
+                    Csla.Core.Configuration.load();
+                    return Csla.Core.Configuration._propertyBackingFieldPrefix;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            return Configuration;
+        })();
+        Core.Configuration = Configuration;
+    })(Csla.Core || (Csla.Core = {}));
+    var Core = Csla.Core;
+})(Csla || (Csla = {}));
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
+/// <reference path="Configuration.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -120,10 +159,11 @@ var Csla;
                         return key;
                     }
                 });
+                var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
                 props.forEach(function (prop) {
                     // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
                     // property names.
-                    if (prop.substring(0, 2) === "__") {
+                    if (prop.substring(0, 2) === prefix) {
                         self[prop] = prop.substring(2);
                     }
                 });
@@ -214,7 +254,8 @@ var Csla;
 
             /**
             * @summary Gets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
             * @example
             * public get property(): number {
             *   return this.getProperty(this.__property);
@@ -244,8 +285,9 @@ var Csla;
 
             /**
             * @summary Sets the value of a property.
-            * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
-            * This will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method
+            * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
             * @param value {any} The value to set.
             * @example
             * public set property(value: number) {
@@ -262,40 +304,6 @@ var Csla;
             return BusinessBase;
         })();
         Core.BusinessBase = BusinessBase;
-    })(Csla.Core || (Csla.Core = {}));
-    var Core = Csla.Core;
-})(Csla || (Csla = {}));
-var Csla;
-(function (Csla) {
-    (function (Core) {
-        var Configuration = (function () {
-            function Configuration() {
-                this.load();
-            }
-            Configuration.prototype.load = function () {
-                // Do some kind of magic here to load a json file or something
-                this._propertyBackingFieldPrefix = "__";
-            };
-
-            Object.defineProperty(Configuration.prototype, "propertyBackingFieldPrefix", {
-                get: function () {
-                    return this._propertyBackingFieldPrefix;
-                },
-                enumerable: true,
-                configurable: true
-            });
-
-            Object.defineProperty(Configuration, "Instance", {
-                get: function () {
-                    Configuration._instance = Configuration._instance ? Configuration._instance : new Configuration();
-                    return Configuration._instance;
-                },
-                enumerable: true,
-                configurable: true
-            });
-            return Configuration;
-        })();
-        Core.Configuration = Configuration;
     })(Csla.Core || (Csla.Core = {}));
     var Core = Csla.Core;
 })(Csla || (Csla = {}));

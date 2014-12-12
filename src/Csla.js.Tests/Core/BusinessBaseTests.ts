@@ -70,61 +70,61 @@ QUnit.test("create BusinessBase and call fetch", (assert) => {
 });
 
 QUnit.test("create child and ensure it is not dirty by default", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
   assert.strictEqual(target.isDirty, false, 'child should not be dirty by default');
 });
 
 QUnit.test("create child, call create, and ensure it is not dirty by default", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
   target.create(1);
   assert.strictEqual(target.isDirty, false, 'child should not be dirty after create');
 });
 
 QUnit.test("create child and ensure setting a property makes it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
   target.childProp = 1;
   assert.strictEqual(target.isDirty, true, 'child was not made dirty by setting a property');
 });
 
 QUnit.test("create child, call create, and ensure setting a property to the same value does not make it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child.constructor);
+  var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
   target.create(1);
   target.childProp = 1;
   assert.strictEqual(target.isDirty, false, 'child should not be dirty by setting a property to the existing value');
 });
 
 QUnit.test("create grandchild and ensure it is not dirty by default", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by default');
 });
 
 QUnit.test("create grandchild, call create, and ensure it is not dirty by default", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   target.create({ childProp: 1, granchildProp: "hello" });
   assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty after create');
 });
 
 QUnit.test("create grandchild and ensure setting a property makes it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   target.grandchildProp = "hello";
   assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a property');
 });
 
 QUnit.test("create grandchild and ensure setting a parent property makes it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   target.childProp = 1;
   assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a parent property');
 });
 
 QUnit.test("create grandchild, call create, and ensure setting a property to the same value does not make it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   target.create({ childProp: 1, grandchildProp: "hello" });
   target.grandchildProp = "hello";
   assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a property to the existing value');
 });
 
 QUnit.test("create grandchild, call create, and ensure setting a parent property to the same value does not make it dirty", (assert: QUnitAssert) => {
-  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild.constructor);
+  var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
   target.create({ childProp: 1, grandchildProp: "hello" });
   target.childProp = 1;
   assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a parent property to the existing value');

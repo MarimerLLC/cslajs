@@ -1,5 +1,6 @@
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
+/// <reference path="Configuration.ts" />
 
 module Csla {
   export module Core {
@@ -36,10 +37,11 @@ module Csla {
             return key;
           }
         });
+        var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
         props.forEach(function (prop: string): void {
           // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
           // property names.
-          if (prop.substring(0, 2) === "__") {
+          if (prop.substring(0, 2) === prefix) {
             self[prop] = prop.substring(2);
           }
         });
@@ -119,7 +121,8 @@ module Csla {
 
       /**
        * @summary Gets the value of a property.
-       * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
+       * @description The name of the property should be passed using a private field prefixed with the value of the 
+       * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
        * @example 
        * public get property(): number {
        *   return this.getProperty(this.__property);
@@ -149,8 +152,9 @@ module Csla {
 
       /**
        * @summary Sets the value of a property.
-       * @description The name of the property should be passed using a private field prefixed with two underscore characters (__).
-       * This will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+       * @description The name of the property should be passed using a private field prefixed with the value of the 
+       * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method 
+       * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
        * @param value {any} The value to set.
        * @example 
        * public set property(value: number) {
