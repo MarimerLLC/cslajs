@@ -1,4 +1,4 @@
-﻿declare module Csla {
+declare module Csla {
     module Reflection {
         /**
         * @summary Contains a number of functions to perform reflection-based features.
@@ -53,11 +53,24 @@ declare module Csla {
 }
 declare module Csla {
     module Core {
+        class Configuration {
+            private static _isLoaded;
+            private static _propertyBackingFieldPrefix;
+            private static load();
+            static propertyBackingFieldPrefix : string;
+        }
+    }
+}
+declare module Csla {
+    module Core {
         /**
         * @summary The core type for editable business objects.
         */
         class BusinessBase implements Serialization.IDeserialization {
             private _classIdentifier;
+            private _isLoading;
+            private _isDirty;
+            private _backer;
             /**
             * @summary Creates an instance of the class.
             * @param scope The scope to use to calculate the class identifier.
@@ -65,10 +78,17 @@ declare module Csla {
             */
             constructor(scope: Object, ctor: Function);
             /**
+            * @summary Initializes the classIdenitifer and backing metadata properties. Must be called in the
+            * constructor of any class extending BusinessBase.
+            * @param scope The scope to use to calculate the class identifier.
+            * @param ctor The constructor used (subclasses should pass in their constructor).
+            */
+            public init(scope: Object, ctor: Function): void;
+            /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             public create(parameters?: Object): void;
             /**
@@ -81,13 +101,46 @@ declare module Csla {
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "fetch" operation on the object.
             * @param parameters An optional argument containing data needed by the object for fetching.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             public fetch(parameters?: Object): void;
             /**
             * @summary Gets the class identifier for this object calculated from the scope given on construction.
             */
             public classIdentifier : string;
+            /**
+            * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
+            * @returns {Boolean}
+            */
+            public isDirty : boolean;
+            /**
+            * @summary Indicates whether the object is currently being loaded.
+            * @returns {Boolean}
+            */
+            public isLoading : boolean;
+            /**
+            * @summary Gets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
+            * @example
+            * public get property(): number {
+            *   return this.getProperty(this.__property);
+            * }
+            */
+            public getProperty(name: string): any;
+            private _sameValue(value1, value2);
+            /**
+            * @summary Sets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method
+            * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+            * @param value {any} The value to set.
+            * @example
+            * public set property(value: number) {
+            *   this.setProperty(this.__property, value);
+            * }
+            */
+            public setProperty(name: string, value: any): void;
         }
     }
 }

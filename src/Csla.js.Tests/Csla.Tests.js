@@ -14,7 +14,9 @@
             * @returns A new object, or a thrown error if it could not be found.
             */
             ReflectionHelpers.createObject = function (classIdentifier, scope) {
-                return new (ReflectionHelpers.getConstructorFunction(classIdentifier, scope))();
+                var ctor = ReflectionHelpers.getConstructorFunction(classIdentifier, scope);
+                var obj = new ctor(scope, ctor);
+                return obj;
             };
 
             /**
@@ -25,14 +27,22 @@
             * @description For more details on how this works, see http://stackoverflow.com/questions/332422/how-do-i-get-the-name-of-an-objects-type-in-javascript.
             */
             ReflectionHelpers.findConstructor = function (obj, f, names) {
+                if (names.length > 20) {
+                    if (console && console.warn) {
+                        console.warn("namespace depth was greater than 20, giving up at: " + names.join("."));
+                        return null;
+                    }
+                }
                 for (var key in obj) {
                     if (obj.hasOwnProperty(key)) {
                         names.push(key);
-
                         if (obj[key] === f) {
                             return names.join(".");
                         } else {
-                            var result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            var result = null;
+                            if (typeof obj[key] === 'object') {
+                                result = ReflectionHelpers.findConstructor(obj[key], f, names);
+                            }
 
                             if (result === null) {
                                 names.pop();
@@ -82,8 +92,39 @@
     })(Csla.Reflection || (Csla.Reflection = {}));
     var Reflection = Csla.Reflection;
 })(Csla || (Csla = {}));
+var Csla;
+(function (Csla) {
+    (function (Core) {
+        var Configuration = (function () {
+            function Configuration() {
+            }
+            Configuration.load = function () {
+                if (Csla.Core.Configuration._isLoaded) {
+                    return;
+                }
+
+                // Do some kind of magic here to load a json file or something
+                Csla.Core.Configuration._propertyBackingFieldPrefix = "__";
+                Csla.Core.Configuration._isLoaded = true;
+            };
+
+            Object.defineProperty(Configuration, "propertyBackingFieldPrefix", {
+                get: function () {
+                    Csla.Core.Configuration.load();
+                    return Csla.Core.Configuration._propertyBackingFieldPrefix;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            return Configuration;
+        })();
+        Core.Configuration = Configuration;
+    })(Csla.Core || (Csla.Core = {}));
+    var Core = Csla.Core;
+})(Csla || (Csla = {}));
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
+/// <reference path="Configuration.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -97,13 +138,42 @@ var Csla;
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
             function BusinessBase(scope, ctor) {
-                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+                this._isLoading = false;
+                this._isDirty = false;
+                this._backer = {};
+                this.init(scope, ctor);
             }
+            /**
+            * @summary Initializes the classIdenitifer and backing metadata properties. Must be called in the
+            * constructor of any class extending BusinessBase.
+            * @param scope The scope to use to calculate the class identifier.
+            * @param ctor The constructor used (subclasses should pass in their constructor).
+            */
+            BusinessBase.prototype.init = function (scope, ctor) {
+                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+                var self = this;
+
+                // Object.keys gets all members of a class; this gets just the properties.
+                var props = Object.keys(this).map(function (key) {
+                    if (typeof self[key] !== "function") {
+                        return key;
+                    }
+                });
+                var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
+                props.forEach(function (prop) {
+                    // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
+                    // property names.
+                    if (prop.substring(0, 2) === prefix) {
+                        self[prop] = prop.substring(2);
+                    }
+                });
+            };
+
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "create" operation on the object.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             BusinessBase.prototype.create = function (parameters) {
                 throw new Error("Must implement create() in subclass.");
@@ -115,25 +185,33 @@ var Csla;
             * @param scope The scope to use to create objects if necessary.
             */
             BusinessBase.prototype.deserialize = function (obj, scope) {
+                this._isLoading = true;
                 for (var key in obj) {
                     var value = obj[key];
 
-                    if (value.hasOwnProperty("_classIdentifier")) {
-                        // This is an object that is a BusinessBase. Create it, and deserialize.
-                        var targetValue = Csla.Reflection.ReflectionHelpers.createObject(value["_classIdentifier"], scope);
-                        targetValue.deserialize(value, scope);
-                        this[key] = targetValue;
+                    // All BusinessBase objects will have a _backer field holding the values of the exposed properties, so deserialize those.
+                    if (key === '_backer') {
+                        this[key] = value;
+                        for (var subkey in value) {
+                            if (value[subkey].hasOwnProperty("_classIdentifier")) {
+                                // This is an object that is a BusinessBase. Create it, and deserialize.
+                                var targetValue = Csla.Reflection.ReflectionHelpers.createObject(value[subkey]["_classIdentifier"], scope);
+                                targetValue.deserialize(value[subkey], scope);
+                                this[key][subkey] = targetValue;
+                            }
+                        }
                     } else {
                         this[key] = value;
                     }
                 }
+                this._isLoading = false;
             };
 
             /**
             * @summary Called by an implementation of the {@link Csla.Core.IDataPortal} interface to run the "fetch" operation on the object.
             * @param parameters An optional argument containing data needed by the object for fetching.
             * @error This throw an error by default - subclasses must override this method to state their intent
-            of being part of the data portal operation pipeline.
+            * of being part of the data portal operation pipeline.
             */
             BusinessBase.prototype.fetch = function (parameters) {
                 throw new Error("Must implement fetch() in subclass.");
@@ -149,6 +227,80 @@ var Csla;
                 enumerable: true,
                 configurable: true
             });
+
+            Object.defineProperty(BusinessBase.prototype, "isDirty", {
+                /**
+                * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
+                * @returns {Boolean}
+                */
+                get: function () {
+                    return this._isDirty;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isLoading", {
+                /**
+                * @summary Indicates whether the object is currently being loaded.
+                * @returns {Boolean}
+                */
+                set: function (value) {
+                    this._isLoading = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            /**
+            * @summary Gets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
+            * @example
+            * public get property(): number {
+            *   return this.getProperty(this.__property);
+            * }
+            */
+            BusinessBase.prototype.getProperty = function (name) {
+                return this._backer[name];
+            };
+
+            BusinessBase.prototype._sameValue = function (value1, value2) {
+                if (value1 === undefined) {
+                    return value2 === undefined;
+                }
+                if (value1 === null) {
+                    return value2 === null;
+                }
+                if (typeof value1 === typeof value2) {
+                    if (typeof value1 === "number" && isNaN(value1) !== isNaN(value2)) {
+                        return false;
+                    }
+                    return value1 === value2;
+                }
+
+                // Allow coercion where necessary.
+                return value1 == value2;
+            };
+
+            /**
+            * @summary Sets the value of a property.
+            * @description The name of the property should be passed using a private field prefixed with the value of the
+            * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__). This method
+            * will flag the parent object as dirty if the object is not loading, and the value differs from the original.
+            * @param value {any} The value to set.
+            * @example
+            * public set property(value: number) {
+            *   this.setProperty(this.__property, value);
+            * }
+            */
+            BusinessBase.prototype.setProperty = function (name, value) {
+                if (!this._isLoading && !this._sameValue(this._backer[name], value)) {
+                    this._isDirty = true;
+                }
+
+                this._backer[name] = value;
+            };
             return BusinessBase;
         })();
         Core.BusinessBase = BusinessBase;
@@ -157,9 +309,76 @@ var Csla;
 })(Csla || (Csla = {}));
 /// <reference path="../Scripts/typings/qunit/qunit.d.ts" />
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
+var __extends = this.__extends || function (d, b) {
+    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
+    function __() { this.constructor = d; }
+    __.prototype = b.prototype;
+    d.prototype = new __();
+};
 QUnit.module("BusinessBase tests: ");
 
 var businessBaseTestsScope = { Csla: Csla };
+
+var SubclassTests;
+(function (SubclassTests) {
+    var Child = (function (_super) {
+        __extends(Child, _super);
+        function Child(scope, ctor) {
+            _super.call(this, scope, ctor);
+            this.__childProp = null;
+            this.init(scope, ctor);
+        }
+        Child.prototype.create = function (parameters) {
+            this.isLoading = true;
+            this.childProp = parameters;
+            this.isLoading = false;
+        };
+
+        Object.defineProperty(Child.prototype, "childProp", {
+            get: function () {
+                return this.getProperty(this.__childProp);
+            },
+            set: function (value) {
+                this.setProperty(this.__childProp, value);
+            },
+            enumerable: true,
+            configurable: true
+        });
+        return Child;
+    })(Csla.Core.BusinessBase);
+    SubclassTests.Child = Child;
+
+    var Grandchild = (function (_super) {
+        __extends(Grandchild, _super);
+        function Grandchild(scope, ctor) {
+            _super.call(this, scope, ctor);
+            this.__grandchildProp = null;
+            this.init(scope, ctor);
+        }
+        Grandchild.prototype.create = function (parameters) {
+            this.isLoading = true;
+            this.childProp = parameters.childProp;
+            this.grandchildProp = parameters.grandchildProp;
+            this.isLoading = false;
+        };
+
+        Object.defineProperty(Grandchild.prototype, "grandchildProp", {
+            get: function () {
+                return this.getProperty(this.__grandchildProp);
+            },
+            set: function (value) {
+                this.setProperty(this.__grandchildProp, value);
+            },
+            enumerable: true,
+            configurable: true
+        });
+
+        return Grandchild;
+    })(Child);
+    SubclassTests.Grandchild = Grandchild;
+})(SubclassTests || (SubclassTests = {}));
+
+var subclassTestsScope = { SubclassTests: SubclassTests };
 
 QUnit.test("create BusinessBase and verify classIdentifier", function (assert) {
     var target = new Csla.Core.BusinessBase(businessBaseTestsScope, Csla.Core.BusinessBase);
@@ -179,6 +398,67 @@ QUnit.test("create BusinessBase and call fetch", function (assert) {
         return target.fetch();
     });
 });
+
+QUnit.test("create child and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty by default');
+});
+
+QUnit.test("create child, call create, and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
+    target.create(1);
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty after create');
+});
+
+QUnit.test("create child and ensure setting a property makes it dirty", function (assert) {
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, true, 'child was not made dirty by setting a property');
+});
+
+QUnit.test("create child, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
+    var target = new SubclassTests.Child(subclassTestsScope, SubclassTests.Child);
+    target.create(1);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, false, 'child should not be dirty by setting a property to the existing value');
+});
+
+QUnit.test("create grandchild and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by default');
+});
+
+QUnit.test("create grandchild, call create, and ensure it is not dirty by default", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    target.create({ childProp: 1, granchildProp: "hello" });
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty after create');
+});
+
+QUnit.test("create grandchild and ensure setting a property makes it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    target.grandchildProp = "hello";
+    assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a property');
+});
+
+QUnit.test("create grandchild and ensure setting a parent property makes it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, true, 'grandchild was not made dirty by setting a parent property');
+});
+
+QUnit.test("create grandchild, call create, and ensure setting a property to the same value does not make it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    target.create({ childProp: 1, grandchildProp: "hello" });
+    target.grandchildProp = "hello";
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a property to the existing value');
+});
+
+QUnit.test("create grandchild, call create, and ensure setting a parent property to the same value does not make it dirty", function (assert) {
+    var target = new SubclassTests.Grandchild(subclassTestsScope, SubclassTests.Grandchild);
+    target.create({ childProp: 1, grandchildProp: "hello" });
+    target.childProp = 1;
+    assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a parent property to the existing value');
+});
 /// <reference path="IDataPortal.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 var Csla;
@@ -197,12 +477,12 @@ var Csla;
             }
             /**
             * @summary Creates an instance of the class defined by a constructor, passing in parameters if they exist.
-            * @param c The constructor of the class to create.
+            * @param ctor The constructor of the class to create.
             * @param parameters An optional argument containing data needed by the object for creating.
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
-            ServerDataPortal.prototype.createWithConstructor = function (c, parameters) {
-                var newObject = new c(this.scope, c);
+            ServerDataPortal.prototype.createWithConstructor = function (ctor, parameters) {
+                var newObject = new ctor(this.scope, ctor);
                 newObject.create(parameters);
                 return newObject;
             };
@@ -214,10 +494,7 @@ var Csla;
             * @returns A new {@link Csla.Core.BusinessBase} instance initialized via the data portal process.
             */
             ServerDataPortal.prototype.createWithIdentifier = function (classIdentifier, parameters) {
-                var newObject = Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope);
-                return this.createWithConstructor(newObject, parameters);
-                //newObject.create(parameters);
-                //return newObject;
+                return this.createWithConstructor(Csla.Reflection.ReflectionHelpers.getConstructorFunction(classIdentifier, this.scope), parameters);
             };
             return ServerDataPortal;
         })();
@@ -229,12 +506,6 @@ var Csla;
 /// <reference path="../../Csla.js/Core/BusinessBase.ts" />
 /// <reference path="../../Csla.js/Core/ServerDataPortal.ts" />
 /// <reference path="../../Csla.js/Reflection/ReflectionHelpers.ts" />
-var __extends = this.__extends || function (d, b) {
-    for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
-    function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
-};
 QUnit.module("ServerDataPortal tests: ");
 
 var ServerDataPortalTests;
@@ -414,6 +685,7 @@ var Csla;
 
             Serializer.prototype.deserialize = function (text, c, scope) {
                 var result = new c(scope, c);
+                result.init(scope, result.constructor);
                 result.deserialize(JSON.parse(text), scope);
                 return result;
             };
@@ -436,13 +708,15 @@ var SerializationTests;
         __extends(Age, _super);
         function Age(scope) {
             _super.call(this, scope, this.constructor);
+            this.__value = null;
+            this.init(scope, this.constructor);
         }
         Object.defineProperty(Age.prototype, "value", {
             get: function () {
-                return this._value;
+                return this.getProperty(this.__value);
             },
             set: function (value) {
-                this._value = value;
+                this.setProperty(this.__value, value);
             },
             enumerable: true,
             configurable: true
@@ -456,13 +730,17 @@ var SerializationTests;
         __extends(Person, _super);
         function Person(scope) {
             _super.call(this, scope, this.constructor);
+            this.__firstName = null;
+            this.__lastName = null;
+            this.__age = null;
+            this.init(scope, this.constructor);
         }
         Object.defineProperty(Person.prototype, "age", {
             get: function () {
-                return this._age;
+                return this.getProperty(this.__age);
             },
             set: function (value) {
-                this._age = value;
+                this.setProperty(this.__age, value);
             },
             enumerable: true,
             configurable: true
@@ -471,10 +749,10 @@ var SerializationTests;
 
         Object.defineProperty(Person.prototype, "firstName", {
             get: function () {
-                return this._firstName;
+                return this.getProperty(this.__firstName);
             },
             set: function (value) {
-                this._firstName = value;
+                this.setProperty(this.__firstName, value);
             },
             enumerable: true,
             configurable: true
@@ -483,10 +761,10 @@ var SerializationTests;
 
         Object.defineProperty(Person.prototype, "lastName", {
             get: function () {
-                return this._lastName;
+                return this.getProperty(this.__lastName);
             },
             set: function (value) {
-                this._lastName = value;
+                this.setProperty(this.__lastName, value);
             },
             enumerable: true,
             configurable: true
