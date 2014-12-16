@@ -1,4 +1,4 @@
-declare module Csla {
+﻿declare module Csla {
     module Reflection {
         /**
         * @summary Contains a number of functions to perform reflection-based features.
@@ -54,10 +54,61 @@ declare module Csla {
 declare module Csla {
     module Core {
         class Configuration {
-            private static _isLoaded;
+            private static _defaultPropertyBackingFieldPrefix;
+            private static _defaultMaximumNamespaceDepth;
             private static _propertyBackingFieldPrefix;
-            private static load();
+            private static _maximumNamespaceDepth;
+            static init(configuration?: any): void;
             static propertyBackingFieldPrefix : string;
+            static maximumNamespaceDepth : number;
+        }
+    }
+}
+declare module Csla {
+    module Core {
+        interface ITrackStatus {
+            /**
+            * @summary Returns true if the object and its child objects are currently valid, false if the object or any of its child
+            * objects have broken rules or are otherwise invalid.
+            * @returns {Boolean}
+            */
+            isValid: boolean;
+            /**
+            * @summary Returns true if the object is currently valid, false if the object has broken rules or is otherwise invalid.
+            * @returns {Boolean}
+            */
+            isSelfValid: boolean;
+            /**
+            * @summary Returns true if the object or any of its child objects have changed since initialization, creation,
+            * or they have been fetched.
+            * @returns {Boolean}
+            */
+            isDirty: boolean;
+            /**
+            * @summary Returns true if the object has changed since initialization, creation, or it was fetched.
+            * @returns {Boolean}
+            */
+            isSelfDirty: boolean;
+            /**
+            * @summary Returns true if the object is marked for deletion.
+            * @returns {Boolean}
+            */
+            isDeleted: boolean;
+            /**
+            * @summary Returns true if this is a new object, false if it is a pre-existing object.
+            * @returns {Boolean}
+            */
+            isNew: boolean;
+            /**
+            * @summary Returns true if this object is both dirty and valid.
+            * @returns {Boolean}
+            */
+            isSavable: boolean;
+            /**
+            * @summary Returns true if the object is a child object, false if it is a root object.
+            * @returns {Boolean}
+            */
+            isChild: boolean;
         }
     }
 }
@@ -66,13 +117,22 @@ declare module Csla {
         /**
         * @summary The core type for editable business objects.
         */
-        class BusinessBase implements Serialization.IDeserialization {
+        class BusinessBase implements Serialization.IDeserialization, ITrackStatus {
             private _classIdentifier;
             private _isLoading;
             private _isDirty;
-            private _backer;
+            private _isNew;
+            private _isDeleted;
+            private _isChild;
+            private _isSelfDirty;
+            private _isValid;
+            private _isSelfValid;
+            private _isBusy;
+            private _isSelfBusy;
+            private _isSavable;
+            private _backingObject;
             /**
-            * @summary Creates an instance of the class.
+            * @summary Creates an instance of the class. Descendents must call init after the super() call.
             * @param scope The scope to use to calculate the class identifier.
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
@@ -108,16 +168,20 @@ declare module Csla {
             * @summary Gets the class identifier for this object calculated from the scope given on construction.
             */
             public classIdentifier : string;
-            /**
-            * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
-            * @returns {Boolean}
-            */
             public isDirty : boolean;
+            public isSelfDirty : boolean;
             /**
-            * @summary Indicates whether the object is currently being loaded.
+            * @summary Returns true if the object is currently being loaded.
             * @returns {Boolean}
             */
             public isLoading : boolean;
+            public isNew : boolean;
+            public isDeleted : boolean;
+            public isSavable : boolean;
+            public isValid : boolean;
+            public isSelfValid : boolean;
+            public isChild : boolean;
+            public isBusy : boolean;
             /**
             * @summary Gets the value of a property.
             * @description The name of the property should be passed using a private field prefixed with the value of the
@@ -141,6 +205,15 @@ declare module Csla {
             * }
             */
             public setProperty(name: string, value: any): void;
+            public markNew(): void;
+            public markOld(): void;
+            public markDeleted(): void;
+            public markDirty(suppressNotification?: boolean): void;
+            public markClean(): void;
+            public markAsChild(): void;
+            public markBusy(): void;
+            public markIdle(): void;
+            public deleteObject(): void;
         }
     }
 }
@@ -208,10 +281,31 @@ declare module Csla {
     }
 }
 declare module Csla {
+    module Rules {
+        interface IRuleFunction {
+            (obj: Core.BusinessBase, primaryPropertyName: string, affectedProperties?: string[], inputProperties?: string[]): boolean;
+        }
+        class CommonRules {
+            public requiredRule: IRuleFunction;
+        }
+    }
+}
+declare module Csla {
     module Serialization {
         class Serializer {
             public serialize(obj: Object): string;
             public deserialize<T extends Core.BusinessBase>(text: string, c: new(scope: Object, ctor: Function) => T, scope: Object): T;
         }
+    }
+}
+declare module Csla {
+    /**
+    * @summary Provides helper methods for dealing with objects.
+    */
+    class ObjectHelpers {
+        /**
+        * @summary Returns all property names for the specified object. Includes inherited properties.
+        */
+        public getPropertyNames(obj: Object): string[];
     }
 }

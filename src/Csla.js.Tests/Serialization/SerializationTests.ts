@@ -12,6 +12,9 @@ module SerializationTests {
 
 		constructor(scope: Object) {
       super(scope, this.constructor);
+      // Note that if the ctor argument is not passed and this.constructor is used,
+      // one must set the default value of the metadata backing fields appropriately.
+      // Contrast with the Child and Grandchild objects in BusinessBaseTests.
       this.__value = null;
       this.init(scope, this.constructor);
 		}

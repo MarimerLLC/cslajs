@@ -1,20 +1,30 @@
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
 /// <reference path="Configuration.ts" />
+/// <reference path="ITrackStatus.ts" />
 
 module Csla {
   export module Core {
     /**
      * @summary The core type for editable business objects.
      */
-    export class BusinessBase implements Csla.Serialization.IDeserialization {
+    export class BusinessBase implements Csla.Serialization.IDeserialization, Csla.Core.ITrackStatus {
       private _classIdentifier: string;
       private _isLoading: boolean = false;
       private _isDirty: boolean = false;
-      private _backer: any = {};
+      private _isNew: boolean = true;
+      private _isDeleted: boolean = false;
+      private _isChild: boolean = false;
+      private _isSelfDirty: boolean = false;
+      private _isValid: boolean = false;
+      private _isSelfValid: boolean = false;
+      private _isBusy: boolean = false;
+      private _isSelfBusy: boolean = false;
+      private _isSavable: boolean = false;
+      private _backingObject: any = {};
 
       /**
-       * @summary Creates an instance of the class.
+       * @summary Creates an instance of the class. Descendents must call init after the super() call.
        * @param scope The scope to use to calculate the class identifier.
        * @param ctor The constructor used (subclasses should pass in their constructor).
        */
@@ -29,20 +39,18 @@ module Csla {
        * @param ctor The constructor used (subclasses should pass in their constructor).
        */
       init(scope: Object, ctor: Function): void {
-        this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
-        var self = this;
-        // Object.keys gets all members of a class; this gets just the properties.
-        var props = Object.keys(this).map(function (key: string) {
-          if (typeof self[key] !== "function") {
+        this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope); // Object.keys gets all members of a class; this gets just the properties.
+        var props = Object.keys(this).map((key: string) => {
+          if (typeof this[key] !== "function") {
             return key;
           }
         });
         var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
-        props.forEach(function (prop: string): void {
+        props.forEach((prop: string): void => {
           // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
           // property names.
           if (prop.substring(0, 2) === prefix) {
-            self[prop] = prop.substring(2);
+            this[prop] = prop.substring(2);
           }
         });
       }
@@ -67,8 +75,8 @@ module Csla {
         for (var key in obj) {
           var value = obj[key];
 
-          // All BusinessBase objects will have a _backer field holding the values of the exposed properties, so deserialize those.
-          if (key === '_backer') {
+          // All BusinessBase objects will have a _backingObject field holding the values of the exposed properties, so deserialize those.
+          if (key === '_backingObject') {
             this[key] = value;
             for (var subkey in value) {
               if (value[subkey].hasOwnProperty("_classIdentifier")) {
@@ -103,20 +111,70 @@ module Csla {
         return this._classIdentifier;
       }
 
-      /**
-       * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
-       * @returns {Boolean}
-       */
       public get isDirty(): boolean {
+        // TODO: Determine child objects' dirtiness
         return this._isDirty;
       }
 
+      public get isSelfDirty(): boolean {
+        return this._isSelfDirty;
+      }
+
       /**
-       * @summary Indicates whether the object is currently being loaded.
+       * @summary Returns true if the object is currently being loaded.
        * @returns {Boolean}
        */
       public set isLoading(value: boolean) {
         this._isLoading = value;
+      }
+
+      public get isNew(): boolean {
+        return this._isNew;
+      }
+
+      public get isDeleted(): boolean {
+        return this._isDeleted;
+      }
+
+      public set isDeleted(value: boolean) {
+        if (this._isDeleted) {
+          throw new Error("This object has been marked for deletion.");
+        }
+
+        this._isDeleted = value;
+      }
+
+      public get isSavable(): boolean {
+        // TODO: Authorization
+        var authorized: boolean = true;
+        if (this.isDeleted) {
+          // authorized = hasPermission(DeleteObject...);
+        }
+        else if (this.isNew) {
+          // authorized = hasPermission(CreateObject...);
+        }
+        else {
+          // authorized = hasPermission(EditObject...);
+        }
+        return authorized && this.isDirty && this.isValid && !this.isBusy;
+      }
+
+      public get isValid(): boolean {
+        // TODO: Rules
+        return this._isValid;
+      }
+
+      public get isSelfValid(): boolean {
+        // TODO: Rules
+        return this._isSelfValid;
+      }
+
+      public get isChild(): boolean {
+        return this._isChild;
+      }
+
+      public get isBusy(): boolean {
+        return this._isBusy;
       }
 
       /**
@@ -129,7 +187,8 @@ module Csla {
        * }
        */
       public getProperty(name: string): any {
-        return this._backer[name];
+        // TODO: Authorization?
+        return this._backingObject[name];
       }
 
       private _sameValue(value1: any, value2: any): boolean {
@@ -162,12 +221,79 @@ module Csla {
        * }
        */
       public setProperty(name: string, value: any): void {
-        if (!this._isLoading && !this._sameValue(this._backer[name], value)) {
-          this._isDirty = true;
+        // TODO: Authorization?
+        // TODO: Events
+        // TODO: Notifications
+        // TODO: ByPassPropertyChecks?
+        if (!this._isLoading && !this._sameValue(this._backingObject[name], value)) {
+          this.markDirty();
         }
 
-        this._backer[name] = value;
+        this._backingObject[name] = value;
       }
+
+      public markNew(): void {
+        this._isNew = true;
+        this._isDeleted = false;
+        // TODO: Notifications
+        this.markDirty();
+      }
+
+      public markOld(): void {
+        this._isNew = false;
+        // TODO: Notifications
+        this.markClean();
+      }
+
+      public markDeleted(): void {
+        this._isDeleted = true;
+        // TODO: Notifications
+        this.markDirty();
+      }
+
+      public markDirty(suppressNotification?: boolean): void {
+        var original = this._isDirty;
+        this._isDirty = true;
+        if (suppressNotification || false) {
+          return;
+        }
+        if (this._isDirty !== original) {
+          // TODO: Notifications
+        }
+      }
+
+      public markClean(): void {
+        this._isDirty = false;
+        // TODO: Notifications
+      }
+
+      public markAsChild(): void {
+        this._isChild = true;
+      }
+
+      public markBusy(): void {
+        if (this._isBusy) {
+          // TODO: Needed?
+          throw new Error("Busy objects may not be marked busy.");
+        }
+        this._isBusy = true;
+        // TODO: Events
+      }
+
+      public markIdle(): void {
+        this._isBusy = false;
+        // TODO: Events
+      }
+
+      public deleteObject(): void {
+        if (this.isChild) {
+          throw new Error("Cannot delete a child object.");
+        }
+
+        this.markDeleted();
+      }
+
+
     }
   }
 } 

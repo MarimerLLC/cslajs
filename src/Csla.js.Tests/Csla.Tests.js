@@ -27,11 +27,9 @@
             * @description For more details on how this works, see http://stackoverflow.com/questions/332422/how-do-i-get-the-name-of-an-objects-type-in-javascript.
             */
             ReflectionHelpers.findConstructor = function (obj, f, names) {
-                if (names.length > 20) {
-                    if (console && console.warn) {
-                        console.warn("namespace depth was greater than 20, giving up at: " + names.join("."));
-                        return null;
-                    }
+                var maxDepth = Csla.Core.Configuration.maximumNamespaceDepth;
+                if (names.length > maxDepth) {
+                    throw new Error("namespace depth was greater than " + maxDepth + ", giving up at: " + names.join("."));
                 }
                 for (var key in obj) {
                     if (obj.hasOwnProperty(key)) {
@@ -40,7 +38,7 @@
                             return names.join(".");
                         } else {
                             var result = null;
-                            if (typeof obj[key] === 'object') {
+                            if (typeof obj[key] === "object") {
                                 result = ReflectionHelpers.findConstructor(obj[key], f, names);
                             }
 
@@ -98,24 +96,35 @@ var Csla;
         var Configuration = (function () {
             function Configuration() {
             }
-            Configuration.load = function () {
-                if (Csla.Core.Configuration._isLoaded) {
-                    return;
-                }
+            Configuration.init = function (configuration) {
+                // TODO: Do some magic here to load configuration data to the properties
+                // We'll need to define a schema for csla.json. Putting this in for now.
+                Configuration._propertyBackingFieldPrefix = Configuration._defaultPropertyBackingFieldPrefix;
+                Configuration._maximumNamespaceDepth = Configuration._defaultMaximumNamespaceDepth;
 
-                // Do some kind of magic here to load a json file or something
-                Csla.Core.Configuration._propertyBackingFieldPrefix = "__";
-                Csla.Core.Configuration._isLoaded = true;
+                if (configuration) {
+                    Configuration._propertyBackingFieldPrefix = configuration.propertyBackingFieldPrefix;
+                    Configuration._maximumNamespaceDepth = configuration.maximumNamespaceDepth;
+                }
             };
 
             Object.defineProperty(Configuration, "propertyBackingFieldPrefix", {
                 get: function () {
-                    Csla.Core.Configuration.load();
-                    return Csla.Core.Configuration._propertyBackingFieldPrefix;
+                    return Configuration._propertyBackingFieldPrefix || Configuration._defaultPropertyBackingFieldPrefix;
                 },
                 enumerable: true,
                 configurable: true
             });
+
+            Object.defineProperty(Configuration, "maximumNamespaceDepth", {
+                get: function () {
+                    return Configuration._maximumNamespaceDepth || Configuration._defaultMaximumNamespaceDepth;
+                },
+                enumerable: true,
+                configurable: true
+            });
+            Configuration._defaultPropertyBackingFieldPrefix = "__";
+            Configuration._defaultMaximumNamespaceDepth = 20;
             return Configuration;
         })();
         Core.Configuration = Configuration;
@@ -125,6 +134,7 @@ var Csla;
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
 /// <reference path="Configuration.ts" />
+/// <reference path="ITrackStatus.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -133,14 +143,23 @@ var Csla;
         */
         var BusinessBase = (function () {
             /**
-            * @summary Creates an instance of the class.
+            * @summary Creates an instance of the class. Descendents must call init after the super() call.
             * @param scope The scope to use to calculate the class identifier.
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
             function BusinessBase(scope, ctor) {
                 this._isLoading = false;
                 this._isDirty = false;
-                this._backer = {};
+                this._isNew = true;
+                this._isDeleted = false;
+                this._isChild = false;
+                this._isSelfDirty = false;
+                this._isValid = false;
+                this._isSelfValid = false;
+                this._isBusy = false;
+                this._isSelfBusy = false;
+                this._isSavable = false;
+                this._backingObject = {};
                 this.init(scope, ctor);
             }
             /**
@@ -150,12 +169,10 @@ var Csla;
             * @param ctor The constructor used (subclasses should pass in their constructor).
             */
             BusinessBase.prototype.init = function (scope, ctor) {
-                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
-                var self = this;
-
-                // Object.keys gets all members of a class; this gets just the properties.
+                var _this = this;
+                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope); // Object.keys gets all members of a class; this gets just the properties.
                 var props = Object.keys(this).map(function (key) {
-                    if (typeof self[key] !== "function") {
+                    if (typeof _this[key] !== "function") {
                         return key;
                     }
                 });
@@ -164,7 +181,7 @@ var Csla;
                     // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
                     // property names.
                     if (prop.substring(0, 2) === prefix) {
-                        self[prop] = prop.substring(2);
+                        _this[prop] = prop.substring(2);
                     }
                 });
             };
@@ -189,8 +206,8 @@ var Csla;
                 for (var key in obj) {
                     var value = obj[key];
 
-                    // All BusinessBase objects will have a _backer field holding the values of the exposed properties, so deserialize those.
-                    if (key === '_backer') {
+                    // All BusinessBase objects will have a _backingObject field holding the values of the exposed properties, so deserialize those.
+                    if (key === '_backingObject') {
                         this[key] = value;
                         for (var subkey in value) {
                             if (value[subkey].hasOwnProperty("_classIdentifier")) {
@@ -229,12 +246,17 @@ var Csla;
             });
 
             Object.defineProperty(BusinessBase.prototype, "isDirty", {
-                /**
-                * @summary Indicates whether the object has changed since initialization, creation or it has been fetched.
-                * @returns {Boolean}
-                */
                 get: function () {
+                    // TODO: Determine child objects' dirtiness
                     return this._isDirty;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isSelfDirty", {
+                get: function () {
+                    return this._isSelfDirty;
                 },
                 enumerable: true,
                 configurable: true
@@ -242,11 +264,86 @@ var Csla;
 
             Object.defineProperty(BusinessBase.prototype, "isLoading", {
                 /**
-                * @summary Indicates whether the object is currently being loaded.
+                * @summary Returns true if the object is currently being loaded.
                 * @returns {Boolean}
                 */
                 set: function (value) {
                     this._isLoading = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isNew", {
+                get: function () {
+                    return this._isNew;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isDeleted", {
+                get: function () {
+                    return this._isDeleted;
+                },
+                set: function (value) {
+                    if (this._isDeleted) {
+                        throw new Error("This object has been marked for deletion.");
+                    }
+
+                    this._isDeleted = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+
+            Object.defineProperty(BusinessBase.prototype, "isSavable", {
+                get: function () {
+                    // TODO: Authorization
+                    var authorized = true;
+                    if (this.isDeleted) {
+                        // authorized = hasPermission(DeleteObject...);
+                    } else if (this.isNew) {
+                        // authorized = hasPermission(CreateObject...);
+                    } else {
+                        // authorized = hasPermission(EditObject...);
+                    }
+                    return authorized && this.isDirty && this.isValid && !this.isBusy;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isValid", {
+                get: function () {
+                    // TODO: Rules
+                    return this._isValid;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isSelfValid", {
+                get: function () {
+                    // TODO: Rules
+                    return this._isSelfValid;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isChild", {
+                get: function () {
+                    return this._isChild;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+            Object.defineProperty(BusinessBase.prototype, "isBusy", {
+                get: function () {
+                    return this._isBusy;
                 },
                 enumerable: true,
                 configurable: true
@@ -262,7 +359,8 @@ var Csla;
             * }
             */
             BusinessBase.prototype.getProperty = function (name) {
-                return this._backer[name];
+                // TODO: Authorization?
+                return this._backingObject[name];
             };
 
             BusinessBase.prototype._sameValue = function (value1, value2) {
@@ -295,11 +393,78 @@ var Csla;
             * }
             */
             BusinessBase.prototype.setProperty = function (name, value) {
-                if (!this._isLoading && !this._sameValue(this._backer[name], value)) {
-                    this._isDirty = true;
+                // TODO: Authorization?
+                // TODO: Events
+                // TODO: Notifications
+                // TODO: ByPassPropertyChecks?
+                if (!this._isLoading && !this._sameValue(this._backingObject[name], value)) {
+                    this.markDirty();
                 }
 
-                this._backer[name] = value;
+                this._backingObject[name] = value;
+            };
+
+            BusinessBase.prototype.markNew = function () {
+                this._isNew = true;
+                this._isDeleted = false;
+
+                // TODO: Notifications
+                this.markDirty();
+            };
+
+            BusinessBase.prototype.markOld = function () {
+                this._isNew = false;
+
+                // TODO: Notifications
+                this.markClean();
+            };
+
+            BusinessBase.prototype.markDeleted = function () {
+                this._isDeleted = true;
+
+                // TODO: Notifications
+                this.markDirty();
+            };
+
+            BusinessBase.prototype.markDirty = function (suppressNotification) {
+                var original = this._isDirty;
+                this._isDirty = true;
+                if (suppressNotification || false) {
+                    return;
+                }
+                if (this._isDirty !== original) {
+                    // TODO: Notifications
+                }
+            };
+
+            BusinessBase.prototype.markClean = function () {
+                this._isDirty = false;
+                // TODO: Notifications
+            };
+
+            BusinessBase.prototype.markAsChild = function () {
+                this._isChild = true;
+            };
+
+            BusinessBase.prototype.markBusy = function () {
+                if (this._isBusy) {
+                    throw new Error("Busy objects may not be marked busy.");
+                }
+                this._isBusy = true;
+                // TODO: Events
+            };
+
+            BusinessBase.prototype.markIdle = function () {
+                this._isBusy = false;
+                // TODO: Events
+            };
+
+            BusinessBase.prototype.deleteObject = function () {
+                if (this.isChild) {
+                    throw new Error("Cannot delete a child object.");
+                }
+
+                this.markDeleted();
             };
             return BusinessBase;
         })();
@@ -458,6 +623,24 @@ QUnit.test("create grandchild, call create, and ensure setting a parent property
     target.create({ childProp: 1, grandchildProp: "hello" });
     target.childProp = 1;
     assert.strictEqual(target.isDirty, false, 'grandchild should not be dirty by setting a parent property to the existing value');
+});
+/// <reference path="../../csla.js/core/businessbase.ts" />
+/// <reference path="../../csla.js/core/configuration.ts" />
+QUnit.module("Configuration tests: ");
+
+QUnit.test("calling configuration without init returns default value", function (assert) {
+    assert.strictEqual(Csla.Core.Configuration.propertyBackingFieldPrefix, "__");
+    assert.strictEqual(Csla.Core.Configuration.maximumNamespaceDepth, 20);
+});
+
+QUnit.test("calling configuration with init returns correct value", function (assert) {
+    Csla.Core.Configuration.init({
+        propertyBackingFieldPrefix: "csla_",
+        maximumNamespaceDepth: 10
+    });
+    assert.strictEqual(Csla.Core.Configuration.propertyBackingFieldPrefix, "csla_");
+    assert.strictEqual(Csla.Core.Configuration.maximumNamespaceDepth, 10);
+    Csla.Core.Configuration.init();
 });
 /// <reference path="IDataPortal.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
@@ -632,9 +815,38 @@ var ReflectionHelpersTests;
     var InnerModule = ReflectionHelpersTests.InnerModule;
 })(ReflectionHelpersTests || (ReflectionHelpersTests = {}));
 
+var ReflectionHelpersTests3;
+(function (ReflectionHelpersTests3) {
+    (function (_Deep) {
+        (function (_Deep) {
+            (function (_Deep) {
+                (function (_Deep) {
+                    (function (_Deep) {
+                        (function (Deep) {
+                            var Nest = (function () {
+                                function Nest() {
+                                }
+                                return Nest;
+                            })();
+                            Deep.Nest = Nest;
+                        })(_Deep.Deep || (_Deep.Deep = {}));
+                        var Deep = _Deep.Deep;
+                    })(_Deep.Deep || (_Deep.Deep = {}));
+                    var Deep = _Deep.Deep;
+                })(_Deep.Deep || (_Deep.Deep = {}));
+                var Deep = _Deep.Deep;
+            })(_Deep.Deep || (_Deep.Deep = {}));
+            var Deep = _Deep.Deep;
+        })(_Deep.Deep || (_Deep.Deep = {}));
+        var Deep = _Deep.Deep;
+    })(ReflectionHelpersTests3.Deep || (ReflectionHelpersTests3.Deep = {}));
+    var Deep = ReflectionHelpersTests3.Deep;
+})(ReflectionHelpersTests3 || (ReflectionHelpersTests3 = {}));
+
 var reflectionHelpersTestsScope = {
     ReflectionHelpersTests: ReflectionHelpersTests,
-    ReflectionHelpersTests2: ReflectionHelpersTests2
+    ReflectionHelpersTests2: ReflectionHelpersTests2,
+    ReflectionHelpersTests3: ReflectionHelpersTests3
 };
 
 QUnit.test("getClassIdentifier for class in nested modules in loaded scope", function (assert) {
@@ -672,6 +884,17 @@ QUnit.test("createObject when class identifier cannot be found", function (asser
         return Csla.Reflection.ReflectionHelpers.createObject("blah", ReflectionHelpersTests);
     });
 });
+
+QUnit.test("findConstructor fails after maximumNamespaceDepth is reached", function (assert) {
+    Csla.Core.Configuration.init({
+        propertyBackingFieldPrefix: "__",
+        maximumNamespaceDepth: 5
+    });
+    assert.throws(function () {
+        return Csla.Reflection.ReflectionHelpers.getClassIdentifier(ReflectionHelpersTests3.Deep.Deep.Deep.Deep.Deep.Deep.Nest, reflectionHelpersTestsScope);
+    });
+    Csla.Core.Configuration.init();
+});
 /// <reference path="../Core/BusinessBase.ts" />
 var Csla;
 (function (Csla) {
@@ -708,6 +931,10 @@ var SerializationTests;
         __extends(Age, _super);
         function Age(scope) {
             _super.call(this, scope, this.constructor);
+
+            // Note that if the ctor argument is not passed and this.constructor is used,
+            // one must set the default value of the metadata backing fields appropriately.
+            // Contrast with the Child and Grandchild objects in BusinessBaseTests.
             this.__value = null;
             this.init(scope, this.constructor);
         }

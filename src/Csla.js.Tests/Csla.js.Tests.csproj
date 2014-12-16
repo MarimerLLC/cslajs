@@ -56,6 +56,7 @@
   </PropertyGroup>
   <ItemGroup>
     <TypeScriptCompile Include="Core\BusinessBaseTests.ts" />
+    <TypeScriptCompile Include="Core\ConfigurationTests.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortalTests.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpersTests.ts" />
     <TypeScriptCompile Include="Scripts\typings\qunit\qunit.d.ts" />

@@ -1,21 +1,29 @@
 ﻿module Csla {
   export module Core {
     export class Configuration {
-      private static _isLoaded: boolean;
+      private static _defaultPropertyBackingFieldPrefix: string = "__";
+      private static _defaultMaximumNamespaceDepth: number = 20;
       private static _propertyBackingFieldPrefix: string;
+      private static _maximumNamespaceDepth: number;
 
-      private static load(): void {
-        if (Csla.Core.Configuration._isLoaded) {
-          return;
+      public static init(configuration?: any): void {
+        // TODO: Do some magic here to load configuration data to the properties
+        // We'll need to define a schema for csla.json. Putting this in for now.
+        Configuration._propertyBackingFieldPrefix = Configuration._defaultPropertyBackingFieldPrefix;
+        Configuration._maximumNamespaceDepth = Configuration._defaultMaximumNamespaceDepth;
+
+        if (configuration) {
+          Configuration._propertyBackingFieldPrefix = configuration.propertyBackingFieldPrefix;
+          Configuration._maximumNamespaceDepth = configuration.maximumNamespaceDepth;
         }
-        // Do some kind of magic here to load a json file or something
-        Csla.Core.Configuration._propertyBackingFieldPrefix = "__";
-        Csla.Core.Configuration._isLoaded = true;
       }
 
       public static get propertyBackingFieldPrefix(): string {
-        Csla.Core.Configuration.load();
-        return Csla.Core.Configuration._propertyBackingFieldPrefix;
+        return Configuration._propertyBackingFieldPrefix || Configuration._defaultPropertyBackingFieldPrefix;
+      }
+
+      public static get maximumNamespaceDepth(): number {
+        return Configuration._maximumNamespaceDepth || Configuration._defaultMaximumNamespaceDepth;
       }
     }
   }

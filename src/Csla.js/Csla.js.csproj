@@ -63,11 +63,14 @@
     <TypeScriptCompile Include="Core\BusinessBase.ts" />
     <TypeScriptCompile Include="Core\Configuration.ts" />
     <TypeScriptCompile Include="Core\DataPortalConfiguration.ts" />
+    <TypeScriptCompile Include="Core\ITrackStatus.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortal.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpers.ts" />
     <TypeScriptCompile Include="Core\IDataPortal.ts" />
+    <TypeScriptCompile Include="Rules\CommonRules.ts" />
     <TypeScriptCompile Include="Serialization\IDeserialization.ts" />
     <TypeScriptCompile Include="Serialization\Serializer.ts" />
+    <TypeScriptCompile Include="Utility\ObjectHelpers.ts" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(VSToolsPath)\TypeScript\Microsoft.TypeScript.targets" Condition="Exists('$(VSToolsPath)\TypeScript\Microsoft.TypeScript.targets')" />

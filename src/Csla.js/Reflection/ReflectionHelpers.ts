@@ -24,11 +24,9 @@ module Csla {
       * @description For more details on how this works, see http://stackoverflow.com/questions/332422/how-do-i-get-the-name-of-an-objects-type-in-javascript.
       */
       private static findConstructor(obj: Object, f: Function, names: string[]): string {
-        if (names.length > 20) {
-          if (console && console.warn) {
-            console.warn("namespace depth was greater than 20, giving up at: " + names.join("."));
-            return null;
-          }
+        var maxDepth = Csla.Core.Configuration.maximumNamespaceDepth;
+        if (names.length > maxDepth) {
+          throw new Error("namespace depth was greater than " + maxDepth + ", giving up at: " + names.join("."));
         }
         for (var key in obj) {
           if (obj.hasOwnProperty(key)) {
@@ -38,7 +36,7 @@ module Csla {
             }
             else {
               var result = null;
-              if (typeof obj[key] === 'object') {
+              if (typeof obj[key] === "object") {
                 result = ReflectionHelpers.findConstructor(obj[key], f, names);
               }
 
