@@ -63,6 +63,8 @@
     <TypeScriptCompile Include="Core\BusinessBase.ts" />
     <TypeScriptCompile Include="Core\Configuration.ts" />
     <TypeScriptCompile Include="Core\DataPortalConfiguration.ts" />
+    <TypeScriptCompile Include="Core\IEditableBusinessObject.ts" />
+    <TypeScriptCompile Include="Core\IParent.ts" />
     <TypeScriptCompile Include="Core\ITrackStatus.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortal.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpers.ts" />
