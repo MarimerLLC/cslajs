@@ -115,9 +115,80 @@ declare module Csla {
 declare module Csla {
     module Core {
         /**
+        * @summary Defines the common methods required by all editable CSLA single objects.
+        * @description It is strongly recommended that the implementations of the methods in this interface be made Private so as to not
+        * clutter up the native interface of the collection objects.
+        */
+        interface IEditableBusinessObject extends ITrackStatus {
+            /**
+            * @summary For internal use only!
+            * @description Altering this value will almost certainly break your code.
+            * This property is for use by the parent collection only!
+            */
+            editLevelAdded: number;
+            /**
+            * @summary Called by a parent object to mark the child for deferred deletion.
+            */
+            deleteChild(): void;
+            /**
+            * @summary Used by BusinessListBase when a child object is created to tell the child object about its parent.
+            * @param {Csla.Core.IParent} parent - A reference to the parent collection object.
+            */
+            setParent(parent: IParent): void;
+            /**
+            * @summary Marks the object for deletion. The object will be deleted as part of the next save operation.
+            */
+            deleteSelf(): void;
+        }
+    }
+}
+declare module Csla {
+    module Core {
+        /**
+        * @summary Defines the interface that must be implemented by any business object that contains child objects.
+        */
+        interface IParent {
+            /**
+            * @summary This method is called by a child object when it wants to be removed from the collection.
+            * @param {Csla.Core.IEditableBusinessObject} child - The child object to remove.
+            */
+            removeChild(child: IEditableBusinessObject): void;
+            /**
+            * @summary Override this method to be notifed when a child object's {@link Csla.Core.BusinessBase#ApplyEdit} method has completed.
+            * @param {Csla.Core.IEditableBusinessObject} child - The child object that was edited.
+            */
+            applyEditChild(child: IEditableBusinessObject): void;
+            /**
+            * @summary Provides access to the parent reference for use in child object code.
+            * @description This value will be {@link external:undefined} for root objects.
+            */
+            parent?: IParent;
+        }
+    }
+}
+declare module Csla {
+    module Utility {
+        /**
+        * @summary Provides helper methods for dealing with objects.
+        */
+        class ObjectHelpers {
+            /**
+            * @summary Returns all property names for the specified object. Includes inherited properties.
+            */
+            static getPropertyNames(obj: Object): string[];
+            /**
+            * @summary Returns true if the objects have the same value. Works best for primitives.
+            */
+            static isSameValue(value1: any, value2: any): boolean;
+        }
+    }
+}
+declare module Csla {
+    module Core {
+        /**
         * @summary The core type for editable business objects.
         */
-        class BusinessBase implements Serialization.IDeserialization, ITrackStatus {
+        class BusinessBase implements Serialization.IDeserialization, IEditableBusinessObject, IParent, ITrackStatus {
             private _classIdentifier;
             private _isLoading;
             private _isDirty;
@@ -130,6 +201,8 @@ declare module Csla {
             private _isBusy;
             private _isSelfBusy;
             private _isSavable;
+            private _editLevelAdded;
+            private _parent;
             private _backingObject;
             /**
             * @summary Creates an instance of the class. Descendents must call init after the super() call.
@@ -183,6 +256,12 @@ declare module Csla {
             public isChild : boolean;
             public isBusy : boolean;
             /**
+            * @summary Gets or sets the current edit level of the object.
+            * @description Allow the collection object to use the edit level as needed.
+            */
+            public editLevelAdded : number;
+            public parent : IParent;
+            /**
             * @summary Gets the value of a property.
             * @description The name of the property should be passed using a private field prefixed with the value of the
             * propertyBackingFieldPrefix configuration property, which by default is two underscore characters (__).
@@ -192,7 +271,6 @@ declare module Csla {
             * }
             */
             public getProperty(name: string): any;
-            private _sameValue(value1, value2);
             /**
             * @summary Sets the value of a property.
             * @description The name of the property should be passed using a private field prefixed with the value of the
@@ -210,10 +288,18 @@ declare module Csla {
             public markDeleted(): void;
             public markDirty(suppressNotification?: boolean): void;
             public markClean(): void;
+            /**
+            * @summary Marks the object as being a child object.
+            */
             public markAsChild(): void;
             public markBusy(): void;
             public markIdle(): void;
-            public deleteObject(): void;
+            public deleteChild(): void;
+            public deleteSelf(): void;
+            public setParent(parent: IParent): void;
+            private findChildPropertyName(child);
+            public removeChild(child: IEditableBusinessObject): void;
+            public applyEditChild(child: IEditableBusinessObject): void;
         }
     }
 }
@@ -296,16 +382,5 @@ declare module Csla {
             public serialize(obj: Object): string;
             public deserialize<T extends Core.BusinessBase>(text: string, c: new(scope: Object, ctor: Function) => T, scope: Object): T;
         }
-    }
-}
-declare module Csla {
-    /**
-    * @summary Provides helper methods for dealing with objects.
-    */
-    class ObjectHelpers {
-        /**
-        * @summary Returns all property names for the specified object. Includes inherited properties.
-        */
-        public getPropertyNames(obj: Object): string[];
     }
 }

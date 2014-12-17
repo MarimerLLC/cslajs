@@ -2,13 +2,17 @@
 /// <reference path="../Serialization/IDeserialization.ts" />
 /// <reference path="Configuration.ts" />
 /// <reference path="ITrackStatus.ts" />
+/// <reference path="IEditableBusinessObject.ts" />
+/// <reference path="IParent.ts" />
+/// <reference path="../Utility/ObjectHelpers.ts" />
 
 module Csla {
   export module Core {
     /**
      * @summary The core type for editable business objects.
      */
-    export class BusinessBase implements Csla.Serialization.IDeserialization, Csla.Core.ITrackStatus {
+    export class BusinessBase implements Csla.Serialization.IDeserialization, Csla.Core.IEditableBusinessObject, Csla.Core.IParent,
+      Csla.Core.ITrackStatus {
       private _classIdentifier: string;
       private _isLoading: boolean = false;
       private _isDirty: boolean = false;
@@ -21,6 +25,10 @@ module Csla {
       private _isBusy: boolean = false;
       private _isSelfBusy: boolean = false;
       private _isSavable: boolean = false;
+      // TODO: Undoable
+      private _editLevelAdded: number = 0;
+      // TODO: Parent/Child
+      private _parent: Csla.Core.IParent;
       private _backingObject: any = {};
 
       /**
@@ -39,16 +47,10 @@ module Csla {
        * @param ctor The constructor used (subclasses should pass in their constructor).
        */
       init(scope: Object, ctor: Function): void {
-        this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope); // Object.keys gets all members of a class; this gets just the properties.
-        var props = Object.keys(this).map((key: string) => {
-          if (typeof this[key] !== "function") {
-            return key;
-          }
-        });
+        this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+        var props = Csla.Utility.ObjectHelpers.getPropertyNames(this);
         var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
         props.forEach((prop: string): void => {
-          // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
-          // property names.
           if (prop.substring(0, 2) === prefix) {
             this[prop] = prop.substring(2);
           }
@@ -170,11 +172,33 @@ module Csla {
       }
 
       public get isChild(): boolean {
+        // TODO: Parent/Child
         return this._isChild;
       }
 
       public get isBusy(): boolean {
         return this._isBusy;
+      }
+
+      /**
+       * @summary Gets or sets the current edit level of the object.
+       * @description Allow the collection object to use the edit level as needed.
+       */
+      public get editLevelAdded(): number {
+      // TODO: Undoable
+        return this._editLevelAdded;
+      }
+
+      public set editLevelAdded(value: number) {
+        this._editLevelAdded = value;
+      }
+
+      public get parent(): Csla.Core.IParent {
+        return this._parent;
+      }
+
+      public set parent(value: Csla.Core.IParent) {
+        this._parent = value;
       }
 
       /**
@@ -189,24 +213,6 @@ module Csla {
       public getProperty(name: string): any {
         // TODO: Authorization?
         return this._backingObject[name];
-      }
-
-      private _sameValue(value1: any, value2: any): boolean {
-        if (value1 === undefined) {
-          return value2 === undefined;
-        }
-        if (value1 === null) {
-          return value2 === null;
-        }
-        if (typeof value1 === typeof value2) {
-          if (typeof value1 === "number" && isNaN(value1) !== isNaN(value2)) {
-            return false;
-          }
-          return value1 === value2;
-        }
-
-        // Allow coercion where necessary.
-        return value1 == value2;
       }
 
       /**
@@ -225,7 +231,8 @@ module Csla {
         // TODO: Events
         // TODO: Notifications
         // TODO: ByPassPropertyChecks?
-        if (!this._isLoading && !this._sameValue(this._backingObject[name], value)) {
+        // TODO: Child Tracking
+        if (!this._isLoading && !Csla.Utility.ObjectHelpers.isSameValue(this._backingObject[name], value)) {
           this.markDirty();
         }
 
@@ -267,8 +274,12 @@ module Csla {
         // TODO: Notifications
       }
 
+      /**
+       * @summary Marks the object as being a child object.
+       */
       public markAsChild(): void {
-        this._isChild = true;
+         // TODO: Parent/Child
+       this._isChild = true;
       }
 
       public markBusy(): void {
@@ -285,7 +296,17 @@ module Csla {
         // TODO: Events
       }
 
-      public deleteObject(): void {
+      public deleteChild(): void {
+        // TODO: Parent/Child
+        if (!this.isChild) {
+          throw new Error("Cannot delete a root object using deleteChild.");          
+        }
+
+        // TODO: Undoable (i.e., BindingEdit = false;)
+        this.markDeleted();
+      }
+
+      public deleteSelf(): void {
         if (this.isChild) {
           throw new Error("Cannot delete a child object.");
         }
@@ -293,7 +314,34 @@ module Csla {
         this.markDeleted();
       }
 
+      public setParent(parent: Csla.Core.IParent): void {
+        // TODO: Parent/Child
+        this._parent = parent;
+      }
 
+      private findChildPropertyName(child: Csla.Core.IEditableBusinessObject): string {
+        var prefix: string = Csla.Core.Configuration.propertyBackingFieldPrefix;
+        for (var property in Csla.Utility.ObjectHelpers.getPropertyNames(this)) {
+          var propName = (<string>property).substring(prefix.length);
+          if (propName in this && this[propName] == child) {
+            return propName;
+          }
+        }
+
+        return null;
+      }
+
+      public removeChild(child: Csla.Core.IEditableBusinessObject): void {
+        var childPropertyName = this.findChildPropertyName(child);
+        if (childPropertyName && childPropertyName.length) {
+          this[childPropertyName] = null;
+        }
+      }
+
+      public applyEditChild(child: Csla.Core.IEditableBusinessObject): void {
+        // TODO: Notifications
+        // Do nothing by default.
+      }
     }
   }
 } 

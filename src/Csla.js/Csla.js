@@ -131,10 +131,60 @@ var Csla;
     })(Csla.Core || (Csla.Core = {}));
     var Core = Csla.Core;
 })(Csla || (Csla = {}));
+/// <reference path="IEditableBusinessObject.ts"/>
+var Csla;
+(function (Csla) {
+    (function (Utility) {
+        /**
+        * @summary Provides helper methods for dealing with objects.
+        */
+        var ObjectHelpers = (function () {
+            function ObjectHelpers() {
+            }
+            /**
+            * @summary Returns all property names for the specified object. Includes inherited properties.
+            */
+            ObjectHelpers.getPropertyNames = function (obj) {
+                return Object.keys(obj).map(function (key) {
+                    if (typeof obj[key] !== "function") {
+                        return key;
+                    }
+                });
+            };
+
+            /**
+            * @summary Returns true if the objects have the same value. Works best for primitives.
+            */
+            ObjectHelpers.isSameValue = function (value1, value2) {
+                if (value1 === undefined) {
+                    return value2 === undefined;
+                }
+                if (value1 === null) {
+                    return value2 === null;
+                }
+                if (typeof value1 === typeof value2) {
+                    if (typeof value1 === "number" && isNaN(value1) !== isNaN(value2)) {
+                        return false;
+                    }
+                    return value1 === value2;
+                }
+
+                // Allow coercion where necessary.
+                return value1 == value2;
+            };
+            return ObjectHelpers;
+        })();
+        Utility.ObjectHelpers = ObjectHelpers;
+    })(Csla.Utility || (Csla.Utility = {}));
+    var Utility = Csla.Utility;
+})(Csla || (Csla = {}));
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
 /// <reference path="Configuration.ts" />
 /// <reference path="ITrackStatus.ts" />
+/// <reference path="IEditableBusinessObject.ts" />
+/// <reference path="IParent.ts" />
+/// <reference path="../Utility/ObjectHelpers.ts" />
 var Csla;
 (function (Csla) {
     (function (Core) {
@@ -159,6 +209,8 @@ var Csla;
                 this._isBusy = false;
                 this._isSelfBusy = false;
                 this._isSavable = false;
+                // TODO: Undoable
+                this._editLevelAdded = 0;
                 this._backingObject = {};
                 this.init(scope, ctor);
             }
@@ -170,16 +222,10 @@ var Csla;
             */
             BusinessBase.prototype.init = function (scope, ctor) {
                 var _this = this;
-                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope); // Object.keys gets all members of a class; this gets just the properties.
-                var props = Object.keys(this).map(function (key) {
-                    if (typeof _this[key] !== "function") {
-                        return key;
-                    }
-                });
+                this._classIdentifier = Csla.Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
+                var props = Csla.Utility.ObjectHelpers.getPropertyNames(this);
                 var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
                 props.forEach(function (prop) {
-                    // Right now, I'm using the convention that two underscores are used to denote metadata-carrying
-                    // property names.
                     if (prop.substring(0, 2) === prefix) {
                         _this[prop] = prop.substring(2);
                     }
@@ -335,6 +381,7 @@ var Csla;
 
             Object.defineProperty(BusinessBase.prototype, "isChild", {
                 get: function () {
+                    // TODO: Parent/Child
                     return this._isChild;
                 },
                 enumerable: true,
@@ -349,6 +396,35 @@ var Csla;
                 configurable: true
             });
 
+            Object.defineProperty(BusinessBase.prototype, "editLevelAdded", {
+                /**
+                * @summary Gets or sets the current edit level of the object.
+                * @description Allow the collection object to use the edit level as needed.
+                */
+                get: function () {
+                    // TODO: Undoable
+                    return this._editLevelAdded;
+                },
+                set: function (value) {
+                    this._editLevelAdded = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+
+            Object.defineProperty(BusinessBase.prototype, "parent", {
+                get: function () {
+                    return this._parent;
+                },
+                set: function (value) {
+                    this._parent = value;
+                },
+                enumerable: true,
+                configurable: true
+            });
+
+
             /**
             * @summary Gets the value of a property.
             * @description The name of the property should be passed using a private field prefixed with the value of the
@@ -361,24 +437,6 @@ var Csla;
             BusinessBase.prototype.getProperty = function (name) {
                 // TODO: Authorization?
                 return this._backingObject[name];
-            };
-
-            BusinessBase.prototype._sameValue = function (value1, value2) {
-                if (value1 === undefined) {
-                    return value2 === undefined;
-                }
-                if (value1 === null) {
-                    return value2 === null;
-                }
-                if (typeof value1 === typeof value2) {
-                    if (typeof value1 === "number" && isNaN(value1) !== isNaN(value2)) {
-                        return false;
-                    }
-                    return value1 === value2;
-                }
-
-                // Allow coercion where necessary.
-                return value1 == value2;
             };
 
             /**
@@ -397,7 +455,8 @@ var Csla;
                 // TODO: Events
                 // TODO: Notifications
                 // TODO: ByPassPropertyChecks?
-                if (!this._isLoading && !this._sameValue(this._backingObject[name], value)) {
+                // TODO: Child Tracking
+                if (!this._isLoading && !Csla.Utility.ObjectHelpers.isSameValue(this._backingObject[name], value)) {
                     this.markDirty();
                 }
 
@@ -442,7 +501,11 @@ var Csla;
                 // TODO: Notifications
             };
 
+            /**
+            * @summary Marks the object as being a child object.
+            */
             BusinessBase.prototype.markAsChild = function () {
+                // TODO: Parent/Child
                 this._isChild = true;
             };
 
@@ -459,12 +522,51 @@ var Csla;
                 // TODO: Events
             };
 
-            BusinessBase.prototype.deleteObject = function () {
+            BusinessBase.prototype.deleteChild = function () {
+                // TODO: Parent/Child
+                if (!this.isChild) {
+                    throw new Error("Cannot delete a root object using deleteChild.");
+                }
+
+                // TODO: Undoable (i.e., BindingEdit = false;)
+                this.markDeleted();
+            };
+
+            BusinessBase.prototype.deleteSelf = function () {
                 if (this.isChild) {
                     throw new Error("Cannot delete a child object.");
                 }
 
                 this.markDeleted();
+            };
+
+            BusinessBase.prototype.setParent = function (parent) {
+                // TODO: Parent/Child
+                this._parent = parent;
+            };
+
+            BusinessBase.prototype.findChildPropertyName = function (child) {
+                var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
+                for (var property in Csla.Utility.ObjectHelpers.getPropertyNames(this)) {
+                    var propName = property.substring(prefix.length);
+                    if (propName in this && this[propName] == child) {
+                        return propName;
+                    }
+                }
+
+                return null;
+            };
+
+            BusinessBase.prototype.removeChild = function (child) {
+                var childPropertyName = this.findChildPropertyName(child);
+                if (childPropertyName && childPropertyName.length) {
+                    this[childPropertyName] = null;
+                }
+            };
+
+            BusinessBase.prototype.applyEditChild = function (child) {
+                // TODO: Notifications
+                // Do nothing by default.
             };
             return BusinessBase;
         })();
@@ -569,27 +671,5 @@ var Csla;
         Serialization.Serializer = Serializer;
     })(Csla.Serialization || (Csla.Serialization = {}));
     var Serialization = Csla.Serialization;
-})(Csla || (Csla = {}));
-var Csla;
-(function (Csla) {
-    /**
-    * @summary Provides helper methods for dealing with objects.
-    */
-    var ObjectHelpers = (function () {
-        function ObjectHelpers() {
-        }
-        /**
-        * @summary Returns all property names for the specified object. Includes inherited properties.
-        */
-        ObjectHelpers.prototype.getPropertyNames = function (obj) {
-            return Object.keys(obj).map(function (key) {
-                if (typeof obj[key] !== "function") {
-                    return key;
-                }
-            });
-        };
-        return ObjectHelpers;
-    })();
-    Csla.ObjectHelpers = ObjectHelpers;
 })(Csla || (Csla = {}));
 //# sourceMappingURL=Csla.js.map
