@@ -20,7 +20,7 @@ module Csla {
        * @summary Provides access to the parent reference for use in child object code.
        * @description This value will be {@link external:undefined} for root objects.
        */
-      parent?: IParent;
+      parent: IParent;
     }
   }
 } 

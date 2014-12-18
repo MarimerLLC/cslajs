@@ -69,6 +69,7 @@
     <TypeScriptCompile Include="Core\ServerDataPortal.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpers.ts" />
     <TypeScriptCompile Include="Core\IDataPortal.ts" />
+    <TypeScriptCompile Include="Rules\BrokenRule.ts" />
     <TypeScriptCompile Include="Rules\CommonRules.ts" />
     <TypeScriptCompile Include="Serialization\IDeserialization.ts" />
     <TypeScriptCompile Include="Serialization\Serializer.ts" />

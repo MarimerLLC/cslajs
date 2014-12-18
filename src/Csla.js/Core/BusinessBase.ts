@@ -14,6 +14,7 @@ module Csla {
     export class BusinessBase implements Csla.Serialization.IDeserialization, Csla.Core.IEditableBusinessObject, Csla.Core.IParent,
       Csla.Core.ITrackStatus {
       private _classIdentifier: string;
+      // Metastate
       private _isLoading: boolean = false;
       private _isDirty: boolean = false;
       private _isNew: boolean = true;
@@ -29,6 +30,9 @@ module Csla {
       private _editLevelAdded: number = 0;
       // TODO: Parent/Child
       private _parent: Csla.Core.IParent;
+      private _children: Csla.Core.IEditableBusinessObject[] = [];
+
+      // Backing object for field values
       private _backingObject: any = {};
 
       /**
@@ -113,11 +117,20 @@ module Csla {
         return this._classIdentifier;
       }
 
+      /**
+       * @summary Returns true if the object or any of its child objects have changed since initialization, creation, 
+       * or they have been fetched.
+       * @returns {Boolean}
+       */
       public get isDirty(): boolean {
         // TODO: Determine child objects' dirtiness
         return this._isDirty;
       }
 
+      /**
+       * @summary Returns true if the object has changed since initialization, creation, or it was fetched.
+       * @returns {Boolean}
+       */
       public get isSelfDirty(): boolean {
         return this._isSelfDirty;
       }
@@ -130,10 +143,18 @@ module Csla {
         this._isLoading = value;
       }
 
+      /**
+       * @summary Returns true if this is a new object, false if it is a pre-existing object.
+       * @returns {Boolean}
+       */
       public get isNew(): boolean {
         return this._isNew;
       }
 
+      /**
+       * @summary Returns true if the object is marked for deletion.
+       * @returns {Boolean}
+       */
       public get isDeleted(): boolean {
         return this._isDeleted;
       }
@@ -146,6 +167,10 @@ module Csla {
         this._isDeleted = value;
       }
 
+      /**
+       * @summary Returns true if this object is both dirty and valid.
+       * @returns {Boolean}
+       */
       public get isSavable(): boolean {
         // TODO: Authorization
         var authorized: boolean = true;
@@ -161,21 +186,38 @@ module Csla {
         return authorized && this.isDirty && this.isValid && !this.isBusy;
       }
 
+      /**
+       * @summary Returns true if the object and its child objects are currently valid, false if the object or any of its child 
+       * objects have broken rules or are otherwise invalid.
+       * @returns {Boolean}
+       */
       public get isValid(): boolean {
         // TODO: Rules
         return this._isValid;
       }
 
+      /**
+       * @summary Returns true if the object is currently valid, false if the object has broken rules or is otherwise invalid.
+       * @returns {Boolean}
+       */
       public get isSelfValid(): boolean {
         // TODO: Rules
         return this._isSelfValid;
       }
 
+      /**
+       * @summary Returns true if the object is a child object, false if it is a root object.
+       * @returns {Boolean}
+       */
       public get isChild(): boolean {
         // TODO: Parent/Child
         return this._isChild;
       }
 
+      /**
+       * @summary Returns true if the object or its child objects are busy.
+       * @returns {Boolean}
+       */
       public get isBusy(): boolean {
         return this._isBusy;
       }
@@ -193,12 +235,16 @@ module Csla {
         this._editLevelAdded = value;
       }
 
+      /**
+       * @summary Provides access to the parent reference for use in child object code.
+       * @description This value will be {@link external:undefined} for root objects.
+       */
       public get parent(): Csla.Core.IParent {
         return this._parent;
       }
 
       public set parent(value: Csla.Core.IParent) {
-        this._parent = value;
+        this.setParent(value);
       }
 
       /**
@@ -232,13 +278,36 @@ module Csla {
         // TODO: Notifications
         // TODO: ByPassPropertyChecks?
         // TODO: Child Tracking
-        if (!this._isLoading && !Csla.Utility.ObjectHelpers.isSameValue(this._backingObject[name], value)) {
+        var currentValue = this._backingObject[name];
+        var isBusinessBase = currentValue instanceof Csla.Core.BusinessBase || value instanceof Csla.Core.BusinessBase;
+        if (!this._isLoading && !Csla.Utility.ObjectHelpers.isSameValue(currentValue, value)) {
           this.markDirty();
+        }
+
+        if (isBusinessBase) {
+          var index = this._children.indexOf(currentValue);
+          if (value == null) {
+            delete this._children[index];
+          }
+          if (value != null) {
+            if (index === -1) {
+              this._children.push(value);
+            } else {
+              this._children[index] = value;
+            }
+          }
         }
 
         this._backingObject[name] = value;
       }
 
+      /**
+       * @summary Marks the object as being a new object. This also marks the object as being dirty and ensures it is not marked 
+       * for deletion.
+       * @description Newly created objects are marked new by default. You should call this method in the implementation of 
+       * DataPortal_Update  when the object is deleted (due to being marked for deletion to indicate that the object no longer
+       * reflects data in the database.
+       */
       public markNew(): void {
         this._isNew = true;
         this._isDeleted = false;
@@ -246,18 +315,35 @@ module Csla {
         this.markDirty();
       }
 
+      /**
+       * @summary Marks the object as being an old (not new) object. This also marks the object as being unchanged (not dirty).
+       * @description You should call this method in the implementation of DataPortal_Fetch to indicate that an existing object
+       * has been successfully retrieved from the database. You should call this method in the implementation of DataPortal_Update
+       * to indicate that a new object has been successfully inserted into the database. If you override this method, make sure
+       * to call the base implementation after executing your new code.
+       */
       public markOld(): void {
         this._isNew = false;
         // TODO: Notifications
         this.markClean();
       }
 
+      /**
+       * @summary Marks the object for deletion. This also marks the object as being dirty.
+       * @description You should call this method in your business logic in the case that you want to have the object deleted when it
+       * is saved to the database.
+       */
       public markDeleted(): void {
         this._isDeleted = true;
         // TODO: Notifications
         this.markDirty();
       }
 
+      /**
+       * @summary Marks an object as being dirty, or changed.
+       * @param {Boolean} suppressNotification true to suppress the PropertyChanged event that is otherwise raised to indicate that 
+       * the object's state has changed.
+       */
       public markDirty(suppressNotification?: boolean): void {
         var original = this._isDirty;
         this._isDirty = true;
@@ -269,6 +355,10 @@ module Csla {
         }
       }
 
+      /**
+       * @summary Forces the object's {@link Csla.Core.BusinesBase#isDirty} flag to false.
+       * @description This method is normally called automatically and is not intended to be called manually.
+       */
       public markClean(): void {
         this._isDirty = false;
         // TODO: Notifications
@@ -282,6 +372,9 @@ module Csla {
        this._isChild = true;
       }
 
+      /**
+       * @summary Marks the object as being busy.
+       */
       public markBusy(): void {
         if (this._isBusy) {
           // TODO: Needed?
@@ -291,11 +384,17 @@ module Csla {
         // TODO: Events
       }
 
+      /**
+       * @summary Marks the object as being idle (not busy).
+       */
       public markIdle(): void {
         this._isBusy = false;
         // TODO: Events
       }
 
+      /**
+       * @summary Called by a parent object to mark the child for deferred deletion.
+       */
       public deleteChild(): void {
         // TODO: Parent/Child
         if (!this.isChild) {
@@ -306,19 +405,31 @@ module Csla {
         this.markDeleted();
       }
 
+      /**
+       * @summary Marks the object for delettion. The object will be deleted as part of the next save operation.
+       */
       public deleteSelf(): void {
         if (this.isChild) {
-          throw new Error("Cannot delete a child object.");
+          throw new Error("Cannot delete a child object using deleteSelf.");
         }
 
         this.markDeleted();
       }
 
+      /**
+       * @summary Used by {@link Csla.Core.BusinessListBase} when a child object is created to tell the child object about its parent.
+       * @param {Csla.Core.IParent} parent A reference to the parent collection object.
+       */
       public setParent(parent: Csla.Core.IParent): void {
         // TODO: Parent/Child
+        // TODO: Collections, BusinessListBase
         this._parent = parent;
       }
 
+      /**
+       * @summary Get the name of the property which holds a reference to the specified child object.
+       * @param {Csla.Core.IEditableBusinessObject} child A child object.
+       */
       private findChildPropertyName(child: Csla.Core.IEditableBusinessObject): string {
         var prefix: string = Csla.Core.Configuration.propertyBackingFieldPrefix;
         for (var property in Csla.Utility.ObjectHelpers.getPropertyNames(this)) {
@@ -331,6 +442,10 @@ module Csla {
         return null;
       }
 
+      /**
+       * @summary This method is called by a child object when it wants to be removed from the collection.
+       * @param {Csla.Core.IEditableBusinessObject} child The child object to remove.
+       */
       public removeChild(child: Csla.Core.IEditableBusinessObject): void {
         var childPropertyName = this.findChildPropertyName(child);
         if (childPropertyName && childPropertyName.length) {
@@ -338,6 +453,10 @@ module Csla {
         }
       }
 
+      /**
+       * @summary Override this method to be notified when a child object's {@link Csla.Core.BusinessBase#applyEdit} 
+       * method has been called.
+       */
       public applyEditChild(child: Csla.Core.IEditableBusinessObject): void {
         // TODO: Notifications
         // Do nothing by default.

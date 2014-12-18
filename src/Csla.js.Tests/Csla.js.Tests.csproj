@@ -59,6 +59,8 @@
     <TypeScriptCompile Include="Core\ConfigurationTests.ts" />
     <TypeScriptCompile Include="Core\ServerDataPortalTests.ts" />
     <TypeScriptCompile Include="Reflection\ReflectionHelpersTests.ts" />
+    <TypeScriptCompile Include="Rules\BrokenRuleTests.ts" />
+    <TypeScriptCompile Include="Rules\CommonRulesTests.ts" />
     <TypeScriptCompile Include="Scripts\typings\qunit\qunit.d.ts" />
     <TypeScriptCompile Include="Serialization\SerializationTests.ts" />
   </ItemGroup>

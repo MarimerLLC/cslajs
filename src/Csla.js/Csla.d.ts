@@ -162,7 +162,7 @@ declare module Csla {
             * @summary Provides access to the parent reference for use in child object code.
             * @description This value will be {@link external:undefined} for root objects.
             */
-            parent?: IParent;
+            parent: IParent;
         }
     }
 }
@@ -203,6 +203,7 @@ declare module Csla {
             private _isSavable;
             private _editLevelAdded;
             private _parent;
+            private _children;
             private _backingObject;
             /**
             * @summary Creates an instance of the class. Descendents must call init after the super() call.
@@ -241,25 +242,67 @@ declare module Csla {
             * @summary Gets the class identifier for this object calculated from the scope given on construction.
             */
             public classIdentifier : string;
+            /**
+            * @summary Returns true if the object or any of its child objects have changed since initialization, creation,
+            * or they have been fetched.
+            * @returns {Boolean}
+            */
             public isDirty : boolean;
+            /**
+            * @summary Returns true if the object has changed since initialization, creation, or it was fetched.
+            * @returns {Boolean}
+            */
             public isSelfDirty : boolean;
             /**
             * @summary Returns true if the object is currently being loaded.
             * @returns {Boolean}
             */
             public isLoading : boolean;
+            /**
+            * @summary Returns true if this is a new object, false if it is a pre-existing object.
+            * @returns {Boolean}
+            */
             public isNew : boolean;
+            /**
+            * @summary Returns true if the object is marked for deletion.
+            * @returns {Boolean}
+            */
             public isDeleted : boolean;
+            /**
+            * @summary Returns true if this object is both dirty and valid.
+            * @returns {Boolean}
+            */
             public isSavable : boolean;
+            /**
+            * @summary Returns true if the object and its child objects are currently valid, false if the object or any of its child
+            * objects have broken rules or are otherwise invalid.
+            * @returns {Boolean}
+            */
             public isValid : boolean;
+            /**
+            * @summary Returns true if the object is currently valid, false if the object has broken rules or is otherwise invalid.
+            * @returns {Boolean}
+            */
             public isSelfValid : boolean;
+            /**
+            * @summary Returns true if the object is a child object, false if it is a root object.
+            * @returns {Boolean}
+            */
             public isChild : boolean;
+            /**
+            * @summary Returns true if the object or its child objects are busy.
+            * @returns {Boolean}
+            */
             public isBusy : boolean;
             /**
             * @summary Gets or sets the current edit level of the object.
             * @description Allow the collection object to use the edit level as needed.
             */
             public editLevelAdded : number;
+            /**
+            * @summary Provides access to the parent reference for use in child object code.
+            * @description This value will be {@link external:undefined} for root objects.
+            */
             public parent : IParent;
             /**
             * @summary Gets the value of a property.
@@ -283,22 +326,78 @@ declare module Csla {
             * }
             */
             public setProperty(name: string, value: any): void;
+            /**
+            * @summary Marks the object as being a new object. This also marks the object as being dirty and ensures it is not marked
+            * for deletion.
+            * @description Newly created objects are marked new by default. You should call this method in the implementation of
+            * DataPortal_Update  when the object is deleted (due to being marked for deletion to indicate that the object no longer
+            * reflects data in the database.
+            */
             public markNew(): void;
+            /**
+            * @summary Marks the object as being an old (not new) object. This also marks the object as being unchanged (not dirty).
+            * @description You should call this method in the implementation of DataPortal_Fetch to indicate that an existing object
+            * has been successfully retrieved from the database. You should call this method in the implementation of DataPortal_Update
+            * to indicate that a new object has been successfully inserted into the database. If you override this method, make sure
+            * to call the base implementation after executing your new code.
+            */
             public markOld(): void;
+            /**
+            * @summary Marks the object for deletion. This also marks the object as being dirty.
+            * @description You should call this method in your business logic in the case that you want to have the object deleted when it
+            * is saved to the database.
+            */
             public markDeleted(): void;
+            /**
+            * @summary Marks an object as being dirty, or changed.
+            * @param {Boolean} suppressNotification true to suppress the PropertyChanged event that is otherwise raised to indicate that
+            * the object's state has changed.
+            */
             public markDirty(suppressNotification?: boolean): void;
+            /**
+            * @summary Forces the object's {@link Csla.Core.BusinesBase#isDirty} flag to false.
+            * @description This method is normally called automatically and is not intended to be called manually.
+            */
             public markClean(): void;
             /**
             * @summary Marks the object as being a child object.
             */
             public markAsChild(): void;
+            /**
+            * @summary Marks the object as being busy.
+            */
             public markBusy(): void;
+            /**
+            * @summary Marks the object as being idle (not busy).
+            */
             public markIdle(): void;
+            /**
+            * @summary Called by a parent object to mark the child for deferred deletion.
+            */
             public deleteChild(): void;
+            /**
+            * @summary Marks the object for delettion. The object will be deleted as part of the next save operation.
+            */
             public deleteSelf(): void;
+            /**
+            * @summary Used by {@link Csla.Core.BusinessListBase} when a child object is created to tell the child object about its parent.
+            * @param {Csla.Core.IParent} parent A reference to the parent collection object.
+            */
             public setParent(parent: IParent): void;
+            /**
+            * @summary Get the name of the property which holds a reference to the specified child object.
+            * @param {Csla.Core.IEditableBusinessObject} child A child object.
+            */
             private findChildPropertyName(child);
+            /**
+            * @summary This method is called by a child object when it wants to be removed from the collection.
+            * @param {Csla.Core.IEditableBusinessObject} child The child object to remove.
+            */
             public removeChild(child: IEditableBusinessObject): void;
+            /**
+            * @summary Override this method to be notified when a child object's {@link Csla.Core.BusinessBase#applyEdit}
+            * method has been called.
+            */
             public applyEditChild(child: IEditableBusinessObject): void;
         }
     }
@@ -368,11 +467,48 @@ declare module Csla {
 }
 declare module Csla {
     module Rules {
-        interface IRuleFunction {
-            (obj: Core.BusinessBase, primaryPropertyName: string, affectedProperties?: string[], inputProperties?: string[]): boolean;
+        /**
+        * @summary Stores details about a specific broken business rule.
+        */
+        class BrokenRule {
+            private _ruleName;
+            private _description;
+            private _property;
+            constructor(name: string, description: string, property: string);
+            /**
+            * @summary Gets the name of the broken rule.
+            */
+            public ruleName : string;
+            /**
+            * @summary Gets the description of the broken rule.
+            */
+            public description : string;
+            /**
+            * @summary Gets the name of the property affected by the broken rule.
+            */
+            public property : string;
+            /**
+            * @summary Returns a string representation of the broken rule.
+            * @returns {String}
+            */
+            public toString(): string;
         }
+    }
+}
+declare module Csla {
+    module Rules {
+        /**
+        * @summary Defines the signature of a function which represents a business rule.
+        */
+        interface IRuleFunction {
+            (obj: Core.BusinessBase, primaryPropertyName: string, brokenRules: BrokenRule[], messageOrCallback?: any, ...args: any[]): boolean;
+        }
+        /**
+        * @summary Defines a number of common rules.
+        */
         class CommonRules {
-            public requiredRule: IRuleFunction;
+            static requiredRule: IRuleFunction;
+            static maxLengthRule: IRuleFunction;
         }
     }
 }
