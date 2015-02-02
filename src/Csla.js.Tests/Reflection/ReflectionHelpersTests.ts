@@ -30,11 +30,28 @@ module ReflectionHelpersTests {
 	}
 }
 
+module ReflectionHelpersTests3 {
+  export module Deep {
+    export module Deep {
+      export module Deep {
+        export module Deep {
+          export module Deep {
+            export module Deep {
+              export class Nest {
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
 
 var reflectionHelpersTestsScope =
 	{
 		ReflectionHelpersTests: ReflectionHelpersTests,
-		ReflectionHelpersTests2: ReflectionHelpersTests2
+    ReflectionHelpersTests2: ReflectionHelpersTests2,
+    ReflectionHelpersTests3: ReflectionHelpersTests3
 	};
 
 QUnit.test("getClassIdentifier for class in nested modules in loaded scope", (assert) => {
@@ -79,4 +96,13 @@ QUnit.test("createObject", (assert) => {
 
 QUnit.test("createObject when class identifier cannot be found", (assert) => {
 	assert.throws(() => Csla.Reflection.ReflectionHelpers.createObject("blah", ReflectionHelpersTests));
+});
+
+QUnit.test("findConstructor fails after maximumNamespaceDepth is reached", (assert) => {
+  Csla.Core.Configuration.init({
+    propertyBackingFieldPrefix: "__",
+    maximumNamespaceDepth: 5
+  });
+  assert.throws(() => Csla.Reflection.ReflectionHelpers.getClassIdentifier(ReflectionHelpersTests3.Deep.Deep.Deep.Deep.Deep.Deep.Nest, reflectionHelpersTestsScope));
+  Csla.Core.Configuration.init();
 });
