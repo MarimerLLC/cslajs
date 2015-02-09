@@ -1,3 +1,4 @@
+/// <reference path="../../csla.js.tests/core/businessbasetests.ts" />
 /// <reference path="../Reflection/ReflectionHelpers.ts" />
 /// <reference path="../Serialization/IDeserialization.ts" />
 /// <reference path="Configuration.ts" />
@@ -7,6 +8,7 @@
 /// <reference path="../Utility/ObjectHelpers.ts" />
 
 module Csla {
+  "use strict";
   export module Core {
     /**
      * @summary The core type for editable business objects.
@@ -24,8 +26,6 @@ module Csla {
       private _isValid: boolean = false;
       private _isSelfValid: boolean = false;
       private _isBusy: boolean = false;
-      private _isSelfBusy: boolean = false;
-      private _isSavable: boolean = false;
       // TODO: Undoable
       private _editLevelAdded: number = 0;
       // TODO: Parent/Child
@@ -54,9 +54,10 @@ module Csla {
         this._classIdentifier = Reflection.ReflectionHelpers.getClassIdentifier(ctor, scope);
         var props = Csla.Utility.ObjectHelpers.getPropertyNames(this);
         var prefix = Csla.Core.Configuration.propertyBackingFieldPrefix;
+        var prefixLength = prefix.length;
         props.forEach((prop: string): void => {
-          if (prop.substring(0, 2) === prefix) {
-            this[prop] = prop.substring(2);
+          if (prop.substring(0, prefixLength) === prefix) {
+            this[prop] = prop.substring(prefixLength);
           }
         });
       }
@@ -78,11 +79,12 @@ module Csla {
        */
       deserialize(obj: Object, scope: Object) {
         this._isLoading = true;
+        /* tslint:disable forin no-string-literal */
         for (var key in obj) {
           var value = obj[key];
 
           // All BusinessBase objects will have a _backingObject field holding the values of the exposed properties, so deserialize those.
-          if (key === '_backingObject') {
+          if (key === "_backingObject") {
             this[key] = value;
             for (var subkey in value) {
               if (value[subkey].hasOwnProperty("_classIdentifier")) {
@@ -92,11 +94,11 @@ module Csla {
                 this[key][subkey] = targetValue;
               }
             }
-          }
-          else {
+          } else {
             this[key] = value;
           }
         }
+        /* tslint:enable forin no-string-literal */
         this._isLoading = false;
       }
 
@@ -176,11 +178,9 @@ module Csla {
         var authorized: boolean = true;
         if (this.isDeleted) {
           // authorized = hasPermission(DeleteObject...);
-        }
-        else if (this.isNew) {
+        } else if (this.isNew) {
           // authorized = hasPermission(CreateObject...);
-        }
-        else {
+        } else {
           // authorized = hasPermission(EditObject...);
         }
         return authorized && this.isDirty && this.isValid && !this.isBusy;
@@ -227,7 +227,7 @@ module Csla {
        * @description Allow the collection object to use the edit level as needed.
        */
       public get editLevelAdded(): number {
-      // TODO: Undoable
+        // TODO: Undoable
         return this._editLevelAdded;
       }
 
@@ -284,6 +284,7 @@ module Csla {
           this.markDirty();
         }
 
+        // TODO: Is this necessary? Pulled from CSLA.NET.
         if (isBusinessBase) {
           var index = this._children.indexOf(currentValue);
           if (value == null) {
@@ -368,8 +369,8 @@ module Csla {
        * @summary Marks the object as being a child object.
        */
       public markAsChild(): void {
-         // TODO: Parent/Child
-       this._isChild = true;
+        // TODO: Parent/Child
+        this._isChild = true;
       }
 
       /**
@@ -398,7 +399,7 @@ module Csla {
       public deleteChild(): void {
         // TODO: Parent/Child
         if (!this.isChild) {
-          throw new Error("Cannot delete a root object using deleteChild.");          
+          throw new Error("Cannot delete a root object using deleteChild.");
         }
 
         // TODO: Undoable (i.e., BindingEdit = false;)
@@ -431,15 +432,19 @@ module Csla {
        * @param {Csla.Core.IEditableBusinessObject} child A child object.
        */
       private findChildPropertyName(child: Csla.Core.IEditableBusinessObject): string {
-        var prefix: string = Csla.Core.Configuration.propertyBackingFieldPrefix;
-        for (var property in Csla.Utility.ObjectHelpers.getPropertyNames(this)) {
-          var propName = (<string>property).substring(prefix.length);
-          if (propName in this && this[propName] == child) {
+        /* tslint:disable forin */
+        var prefix: string = Csla.Core.Configuration.propertyBackingFieldPrefix,
+          properties: string[] = Csla.Utility.ObjectHelpers.getPropertyNames(this);
+        for (var i = 0, z = properties.length; i < z; i++) {
+          var property = properties[i],
+            propName = property.substring(prefix.length);
+          if (propName in this && this[propName] === child) {
             return propName;
           }
         }
 
         return null;
+        /* tslint:enable forin */
       }
 
       /**
@@ -449,6 +454,7 @@ module Csla {
       public removeChild(child: Csla.Core.IEditableBusinessObject): void {
         var childPropertyName = this.findChildPropertyName(child);
         if (childPropertyName && childPropertyName.length) {
+          // TODO: setParent on child object to null?
           this[childPropertyName] = null;
         }
       }

@@ -1,4 +1,5 @@
 ﻿module Csla {
+  "use strict";
   export module Core {
     export interface ITrackStatus {
       /**

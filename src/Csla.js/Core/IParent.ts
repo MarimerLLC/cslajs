@@ -1,6 +1,7 @@
 ﻿/// <reference path="IEditableBusinessObject.ts"/>
 
 module Csla {
+  "use strict";
   export module Core {
     /**
      * @summary Defines the interface that must be implemented by any business object that contains child objects.

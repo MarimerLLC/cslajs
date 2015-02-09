@@ -1,4 +1,5 @@
 ﻿module Csla {
+  "use strict";
   export module Core {
     /**
      * @summary Defines the common methods required by all editable CSLA single objects.
