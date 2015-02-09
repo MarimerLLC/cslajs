@@ -1,12 +1,13 @@
 ﻿module Csla {
+  "use strict";
   export module Utility {
     /**
-   * @summary Provides helper methods for dealing with objects.
-   */
+     * @summary Provides helper methods for dealing with objects.
+     */
     export class ObjectHelpers {
       /**
-     * @summary Returns all property names for the specified object. Includes inherited properties.
-     */
+       * @summary Returns all property names for the specified object. Includes inherited properties.
+       */
       public static getPropertyNames(obj: Object): string[] {
         return Object.keys(obj).map((key: string) => {
           if (typeof obj[key] !== "function") {
@@ -16,8 +17,8 @@
       }
 
       /**
-     * @summary Returns true if the objects have the same value. Works best for primitives.
-     */
+       * @summary Returns true if the objects have the same value. Works best for primitives.
+       */
       public static isSameValue(value1: any, value2: any): boolean {
         if (value1 === undefined) {
           return value2 === undefined;
@@ -33,7 +34,9 @@
         }
 
         // Allow coercion where necessary.
+        /* tslint:disable */
         return value1 == value2;
+        /* tslint:enable */
       }
     }
   }

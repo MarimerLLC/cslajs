@@ -3,8 +3,11 @@
 QUnit.module("Common Rules tests:");
 
 module CommonRulesTests {
+  "use strict";
   export class Apple extends Csla.Core.BusinessBase {
+    /* tslint:disable no-unsed-variable */
     private __color: string = null;
+    /* tslint:enable no-unsed-variable */
 
     constructor(scope: Object, ctor: Function) {
       super(scope, ctor);

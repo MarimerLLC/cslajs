@@ -1,4 +1,5 @@
 ﻿ module Csla {
+  "use strict";
    export module Rules {
      /**
       * @summary Stores details about a specific broken business rule.
@@ -7,7 +8,7 @@
        private _ruleName: string;
        private _description: string;
        private _property: string;
-       
+
        constructor(name: string, description: string, property: string) {
          this._ruleName = name;
          this._description = description;

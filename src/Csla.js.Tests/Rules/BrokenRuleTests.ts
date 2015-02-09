@@ -10,4 +10,4 @@ QUnit.test("constructor sets properties appropriately", (assert: QUnitAssert) =>
   assert.strictEqual(brokenRule.description, description);
   assert.strictEqual(brokenRule.property, property);
   assert.strictEqual(brokenRule.toString(), description);
-})
+});
